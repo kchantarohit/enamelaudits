@@ -1,0 +1,3 @@
+# One practice per line: URL, Practice Name
+# Find them on Google Maps ("dentist in <city>"), take the website from each listing.
+https://example-dental.com, Example Family Dental
