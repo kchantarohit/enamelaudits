@@ -108,7 +108,13 @@
       </div>
       <p class="fine">No login or website access needed. We only look at public pages. Full report delivered within 24 hours.</p>
     </div>
-    <form class="snap" id="snapshot" action="mailto:kchantarohit@gmail.com" method="post" enctype="text/plain" aria-labelledby="snap-title">
+    <!-- Submissions go to FormSubmit (no account needed). The very first submission sends an
+         activation email to kchantarohit@gmail.com: click the link in it once and the form is live. -->
+    <form class="snap" id="snapshot" action="https://formsubmit.co/kchantarohit@gmail.com" method="post" aria-labelledby="snap-title">
+      <input type="hidden" name="_subject" value="New free snapshot request">
+      <input type="hidden" name="_template" value="table">
+      <input type="hidden" name="_captcha" value="false">
+      <input type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">
       <h2 id="snap-title" style="font-size:1.3rem">Free website snapshot</h2>
       <p class="fine" style="margin-top:0">Your overall score plus your top 3 issues, free.</p>
       <label for="f-name">Your name</label>
@@ -121,6 +127,7 @@
       <input id="f-email" name="email" type="email" autocomplete="email" required>
       <button class="btn btn-primary" type="submit">Get your free snapshot</button>
       <p class="fine">We'll email your snapshot and nothing else unless you ask. No spam.</p>
+      <p id="snap-status" role="status" aria-live="polite" style="margin:8px 0 0;font-weight:600"></p>
     </form>
   </div>
 </section>
@@ -255,5 +262,24 @@
     <p class="fine" style="color:#b8c3cf">Reports are automated reviews of publicly available pages and are provided for informational purposes. Accessibility checks cover basics only and are not legal advice. No specific search ranking or patient results are guaranteed.</p>
   </div>
 </footer>
+<script>
+(function(){
+  var f=document.getElementById('snapshot'); if(!f||!window.fetch) return; // no JS: plain POST still works
+  var endpoint=f.getAttribute('action').replace('formsubmit.co/','formsubmit.co/ajax/');
+  var status=document.getElementById('snap-status'), btn=f.querySelector('button[type=submit]');
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    btn.disabled=true; btn.textContent='Sending\u2026'; status.style.color=''; status.textContent='';
+    fetch(endpoint,{method:'POST',body:new FormData(f),headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.json().then(function(d){ if(!r.ok||String(d.success)==='false') throw new Error(d.message||r.status); }); })
+      .then(function(){
+        f.reset(); status.style.color='var(--good)';
+        status.textContent='Thanks! Your free snapshot will be in your inbox within 24 hours.';
+        btn.textContent='Request sent'; })
+      .catch(function(){ btn.disabled=false; btn.textContent='Get your free snapshot'; status.style.color='var(--bad)';
+        status.innerHTML='Sorry, that didn\u2019t go through. Please email <a href="mailto:kchantarohit@gmail.com">kchantarohit@gmail.com</a> with your website address.'; });
+  });
+})();
+</script>
 </body>
 </html>
