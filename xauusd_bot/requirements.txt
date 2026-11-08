@@ -1,0 +1,8 @@
+numpy>=1.26
+pandas>=2.1
+PyYAML>=6.0
+pytest>=8.0
+# Live trading on MetaTrader 5 (Windows only):
+# MetaTrader5>=5.0.45
+# Optional data source for quick experiments (futures proxy GC=F, not spot):
+# yfinance>=0.2

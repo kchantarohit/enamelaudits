@@ -1,0 +1,65 @@
+# XAUUSD bot configuration. Every key is optional; omitted keys use code defaults
+# (xauusd_bot/config.py). Unknown keys are rejected so typos never pass silently.
+# Copy to config/live.yaml for live trading and fill in instrument costs from YOUR broker.
+instrument: {symbol: XAUUSD, contract_size: 100.0, volume_min: 0.01, volume_step: 0.01,
+  volume_max: 50.0, tick_size: 0.01, spread: 0.25, slippage: 0.05, commission_per_lot: 7.0}
+timeframes: {ltf: 15min, htf: 4h}
+strategy:
+  swing_len: 3
+  sweep_lookback: 40
+  bos_window: 12
+  displacement_atr: 1.0
+  ob_entry: proximal
+  order_expiry_bars: 16
+  sl_atr_buffer: 0.25
+  min_sl_atr: 0.5
+  max_sl_atr: 3.0
+  atr_len: 14
+  rsi_len: 14
+  ema_fast: 50
+  ema_slow: 200
+  htf_ema_fast: 50
+  htf_ema_slow: 200
+  vp_window: 480
+  vp_bins: 40
+  vp_value_area: 0.7
+  atr_pct_window: 500
+  atr_pct_min: 0.2
+  atr_pct_max: 0.95
+  min_confluence: 3
+  rsi_sweep_long_max: 45.0
+  vp_proximity_atr: 1.0
+  require_room_rr: 2.0
+  room_lookback: 480
+  sessions:
+  - [7, 11]
+  - [12, 16]
+  friday_cutoff_hour: 18
+management:
+  tp_r: [2.0, 3.0, 5.0]
+  tp_weights: [0.4, 0.3, 0.3]
+  breakeven_trigger_r: 1.0
+  breakeven_offset_r: 0.05
+  lock_tp1_after_tp2: true
+  trail_atr_mult: 2.5
+  max_hold_bars: 192
+  close_before_weekend: true
+  weekend_close_hour: 20
+risk: {risk_per_trade: 0.01, max_risk_per_trade: 0.02, daily_dd_limit: 0.03, max_total_dd: 0.15,
+  max_trades_per_day: 3, max_open_trades: 1, max_consecutive_losses: 4, day_reset_hour_utc: 0}
+backtest: {initial_balance: 10000.0, conservative_intrabar: true}
+walkforward:
+  is_months: 12
+  oos_months: 3
+  step_months: 3
+  min_trades_is: 8
+  objective: expectancy_r
+  robust_neighbourhood: true
+  grid:
+    strategy.displacement_atr: [0.8, 1.0, 1.3]
+    strategy.min_confluence: [2, 3, 4]
+    management.breakeven_trigger_r: [1.0, 1.5]
+  cv_folds: 8
+  cv_embargo_days: 5
+live: {broker: paper, magic: 240611, poll_seconds: 5, history_bars: 3000, max_spread: 0.6,
+  state_dir: state, mt5_login: null, mt5_password: null, mt5_server: null, mt5_path: null}
