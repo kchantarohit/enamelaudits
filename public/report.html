@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Your Website Health Report | Enamel Audits</title>
+<style>
+  :root{--ink:#1a2433;--muted:#4a5568;--brand:#0b6e6e;--brand-dark:#084f4f;--bg:#f6f8fa;--line:#d9e0e7;--bad:#991b1b}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55}
+  header{background:#fff;border-bottom:1px solid var(--line)}
+  .wrap{max-width:760px;margin:0 auto;padding:0 16px}
+  header .wrap{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .logo{font-weight:800;font-size:1.2rem;color:var(--brand-dark);text-decoration:none}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin:20px 0;overflow-wrap:anywhere}
+  .btn{display:inline-block;padding:12px 18px;border-radius:8px;font-weight:700;text-decoration:none;border:2px solid var(--brand);background:var(--brand);color:#fff;cursor:pointer;font-size:1rem}
+  .btn.secondary{background:#fff;color:var(--brand-dark)}
+  .actions{display:flex;gap:10px;flex-wrap:wrap}
+  .err{color:var(--bad);font-weight:600}
+  .spinner{display:inline-block;width:18px;height:18px;border:3px solid #cbd5e1;border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+  @media print{header,.actions,.upsell,.noprint{display:none!important}body{background:#fff}.card{border:0;padding:0;margin:0}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><a class="logo" href="/">Enamel Audits.</a><span class="noprint" style="color:var(--muted);font-size:.9rem">Order confirmed</span></div></header>
+<main class="wrap">
+  <div id="status" class="card" role="status" aria-live="polite"><p><span class="spinner" aria-hidden="true"></span>Thanks for your order! Running your full website health check now. This takes about 30 seconds…</p></div>
+  <div id="report" class="card" hidden></div>
+  <div id="extras" hidden>
+    <div class="actions"><button class="btn" type="button" onclick="window.print()">Print / save as PDF</button><a class="btn secondary" href="/">Back to home</a></div>
+    <div id="upsell" class="card upsell" hidden>
+      <h2 style="margin-top:0;font-size:1.2rem">Keep your score up, automatically</h2>
+      <p>Websites drift: plugin updates, new pages, expired certificates. Monitoring re-runs this full check every month and emails you the score change. &#36;29/month, cancel anytime.</p>
+      <a class="btn" id="monitor-link" href="#">Add monthly monitoring</a>
+    </div>
+    <p class="noprint" style="color:var(--muted);font-size:.9rem">Want us to fix these issues for you? Email <a href="mailto:kchantarohit@gmail.com?subject=Fix-It%20quote">kchantarohit@gmail.com</a> for a fixed-price Fix-It quote.</p>
+  </div>
+</main>
+<script>
+(function () {
+  var statusEl = document.getElementById('status');
+  var id = new URLSearchParams(location.search).get('session_id');
+  var esc = function (s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+  if (!id) { statusEl.innerHTML = '<p class="err">This link is missing its order reference. Please use the link in your report email.</p>'; return; }
+  var tries = 0;
+  function load() {
+    fetch('/api/report?session_id=' + encodeURIComponent(id)).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; });
+    }).then(function (res) {
+      // Payment can take a few seconds to confirm (e.g. bank redirects). Retry a few times.
+      if (res.status === 402 && tries++ < 6) { setTimeout(load, 4000); return; }
+      if (!res.ok) { statusEl.innerHTML = '<p class="err">' + esc(res.j.error || 'Something went wrong. Please refresh.') + '</p>'; return; }
+      var j = res.j;
+      document.title = 'Report: ' + j.host + ' (' + j.score + '/100) | Enamel Audits';
+      statusEl.innerHTML = '<p><strong>Your report is ready.</strong> ' + (j.email ? 'A copy is on its way to <strong>' + esc(j.email) + '</strong>. ' : '') + 'Bookmark this page: it shows a fresh check every time you open it.</p>';
+      var rep = document.getElementById('report');
+      rep.innerHTML = j.html; // server-rendered, all values HTML-escaped
+      rep.hidden = false;
+      document.getElementById('extras').hidden = false;
+      if (j.monitorUrl) { document.getElementById('monitor-link').href = j.monitorUrl; document.getElementById('upsell').hidden = false; }
+      if (j.portalUrl) statusEl.innerHTML += '<p><a href="' + esc(j.portalUrl) + '">Manage or cancel your monitoring</a></p>';
+    }).catch(function () {
+      statusEl.innerHTML = '<p class="err">Network problem loading your report. Please refresh the page. Your report is also being emailed to you.</p>';
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

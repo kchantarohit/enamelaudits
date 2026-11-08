@@ -76,6 +76,19 @@
   details p{margin:10px 0 0;color:var(--muted)}
   footer{background:#0f1c2a;color:#d6dde5;padding:40px 0;font-size:.95rem}
   footer a{color:#9fe0e0}
+  .hp{position:absolute;left:-5000px;width:1px;height:1px;overflow:hidden}
+  #snap-status{margin-top:12px}
+  .err{color:var(--bad);font-weight:600}
+  .result h3{margin:0}
+  .result .big{font-size:2.6rem;font-weight:800;line-height:1}
+  .result .issue{margin:8px 0;padding:10px 12px;font-size:.95rem}
+  .issue.low{border-color:#475569;background:#f1f5f9}
+  .tag.low{background:#475569;color:#fff}
+  .spinner{display:inline-block;width:18px;height:18px;border:3px solid #cbd5e1;border-top-color:var(--brand);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+  dialog#buy{border:1px solid var(--line);border-radius:12px;padding:24px;max-width:440px;width:calc(100% - 32px)}
+  dialog#buy::backdrop{background:rgba(15,28,42,.55)}
   @media (max-width:860px){.hero-grid,.g3,.g4,.score{grid-template-columns:1fr}.g4{grid-template-columns:1fr 1fr}.dial{margin:0 auto}}
   @media (max-width:520px){.g4{grid-template-columns:1fr}.bars li{grid-template-columns:100px 1fr 40px}section{padding:48px 0}}
 </style>
@@ -104,13 +117,13 @@
       <p class="lead">Get a plain-English health check of your dental practice website: speed, security, Google basics, mobile, accessibility basics, and whether patients can easily call or book. Every issue comes with a clear fix your web person can follow.</p>
       <div class="btns">
         <a class="btn btn-primary" href="#snapshot">Get your free snapshot</a>
-        <a class="btn btn-secondary" href="https://buy.stripe.com/9B64gz5Pc8lC15E2A65kk00">Buy full report &mdash; &#36;97</a>
+        <a class="btn btn-secondary" data-plan="report" href="https://buy.stripe.com/9B64gz5Pc8lC15E2A65kk00">Buy full report &mdash; &#36;97</a>
       </div>
-      <p class="fine">No login or website access needed. We only look at public pages. Full report delivered within 24 hours.</p>
+      <p class="fine">No login or website access needed. We only look at public pages. Full report delivered to your inbox in minutes.</p>
     </div>
     <form class="snap" id="snapshot" action="mailto:kchantarohit@gmail.com" method="post" enctype="text/plain" aria-labelledby="snap-title">
       <h2 id="snap-title" style="font-size:1.3rem">Free website snapshot</h2>
-      <p class="fine" style="margin-top:0">Your overall score plus your top 3 issues, free.</p>
+      <p class="fine" style="margin-top:0">Your overall score plus your top 3 issues, free, in about 20 seconds.</p>
       <label for="f-name">Your name</label>
       <input id="f-name" name="name" type="text" autocomplete="name" required>
       <label for="f-practice">Practice or business name</label>
@@ -119,7 +132,9 @@
       <input id="f-url" name="website" type="url" placeholder="https://yourpractice.com" required>
       <label for="f-email">Email for your snapshot</label>
       <input id="f-email" name="email" type="email" autocomplete="email" required>
+      <div class="hp" aria-hidden="true"><label for="f-hp">Leave this empty</label><input id="f-hp" name="hp" type="text" tabindex="-1" autocomplete="off"></div>
       <button class="btn btn-primary" type="submit">Get your free snapshot</button>
+      <div id="snap-status" role="status" aria-live="polite"></div>
       <p class="fine">We'll email your snapshot and nothing else unless you ask. No spam.</p>
     </form>
   </div>
@@ -192,23 +207,23 @@
       <div class="card price">
         <h3>Free Snapshot</h3>
         <div class="amt">&#36;0</div>
-        <ul class="ticks"><li>Overall score and grade</li><li>Your top 3 issues</li><li>Emailed to you</li></ul>
+        <ul class="ticks"><li>Overall score and grade</li><li>Your top 3 issues</li><li>Instant on screen, plus emailed</li></ul>
         <a class="btn btn-secondary" href="#snapshot">Get your free snapshot</a>
       </div>
       <div class="card price featured">
         <span class="badge">Most popular</span>
         <h3>Full Health Report</h3>
         <div class="amt">&#36;97 <small>one-time</small></div>
-        <ul class="ticks"><li>Every check, every finding</li><li>Prioritized fix list for your web person</li><li>Plain-English impact for each issue</li><li>Print-to-PDF ready</li><li>Delivered within 24 hours</li><li><strong>Founding-clinic bonus:</strong> first month of Monitoring free (first 25 buyers)</li></ul>
-        <a class="btn btn-primary" href="https://buy.stripe.com/9B64gz5Pc8lC15E2A65kk00">Buy full report &mdash; &#36;97</a>
+        <ul class="ticks"><li>Every check, every finding</li><li>Prioritized fix list for your web person</li><li>Plain-English impact for each issue</li><li>Print-to-PDF ready</li><li>Delivered in minutes, automatically</li><li><strong>Founding-clinic bonus:</strong> first month of Monitoring free (first 25 buyers)</li></ul>
+        <a class="btn btn-primary" data-plan="report" href="https://buy.stripe.com/9B64gz5Pc8lC15E2A65kk00">Buy full report &mdash; &#36;97</a>
       </div>
       <div class="card price">
         <h3>Monitoring</h3>
         <div class="amt">&#36;29 <small>/month</small></div>
         <p class="fine" style="margin:0 0 8px">or &#36;290/year &mdash; 2 months free</p>
         <ul class="ticks"><li>Fresh full report every month</li><li>Score change since last month</li><li>Catch new problems early, e.g. after a site update</li><li>Cancel anytime</li></ul>
-        <a class="btn btn-secondary" href="https://buy.stripe.com/5kQcN54L8bxO6pY4Ie5kk01">Monthly &mdash; &#36;29/mo</a>
-        <a class="btn btn-secondary" style="margin-top:8px" href="https://buy.stripe.com/5kQcN5gtQ7hy8y66Qm5kk02">Annual &mdash; &#36;290/yr</a>
+        <a class="btn btn-secondary" data-plan="monthly" href="https://buy.stripe.com/5kQcN54L8bxO6pY4Ie5kk01">Monthly &mdash; &#36;29/mo</a>
+        <a class="btn btn-secondary" data-plan="annual" style="margin-top:8px" href="https://buy.stripe.com/5kQcN5gtQ7hy8y66Qm5kk02">Annual &mdash; &#36;290/yr</a>
       </div>
       <div class="card price">
         <h3>Fix-It Package</h3>
@@ -226,8 +241,8 @@
     <h2>How it works</h2>
     <ol class="steps grid g3" style="margin-top:24px">
       <li class="card"><h3>Send your website address</h3><p>Use the free snapshot form or buy the full report. No passwords, no plugins, no access to your site.</p></li>
-      <li class="card"><h3>We run the health check</h3><p>We review your public pages for speed, security, Google basics, mobile, accessibility basics, and patient actions.</p></li>
-      <li class="card"><h3>Get your report within 24 hours</h3><p>A clear report lands in your inbox with a score and a prioritized fix list you can hand to your web person.</p></li>
+      <li class="card"><h3>We run the health check</h3><p>Our automated checker reviews your public pages for speed, security, Google basics, mobile, accessibility basics, and patient actions.</p></li>
+      <li class="card"><h3>Get your report in minutes</h3><p>Your report appears on screen right after checkout and lands in your inbox, with a score and a prioritized fix list you can hand to your web person.</p></li>
     </ol>
   </div>
 </section>
@@ -247,6 +262,22 @@
   </div>
 </section>
 </main>
+
+<dialog id="buy" aria-labelledby="buy-title">
+  <form method="dialog" id="buy-form" class="snap" style="box-shadow:none;border:0;padding:0">
+    <h2 id="buy-title" style="font-size:1.3rem;margin-top:0">Which website should we check?</h2>
+    <p class="fine" id="buy-plan" style="margin-top:0"></p>
+    <label for="b-url">Website address</label>
+    <input id="b-url" name="url" type="text" inputmode="url" placeholder="yourpractice.com" required>
+    <label for="b-email">Email for your report</label>
+    <input id="b-email" name="email" type="email" autocomplete="email" required>
+    <button class="btn btn-primary" type="submit" id="buy-go">Continue to secure checkout</button>
+    <button class="btn btn-secondary" type="button" id="buy-cancel" style="margin-top:8px;width:100%">Cancel</button>
+    <div id="buy-status" role="status" aria-live="polite" class="fine"></div>
+    <p class="fine">Payments are processed by Stripe. We never see your card details.</p>
+  </form>
+</dialog>
+<script src="/app.js" defer></script>
 
 <footer>
   <div class="wrap">
