@@ -29,7 +29,7 @@ export async function GET(request) {
   const target = session.metadata?.url || session.custom_fields?.find(f => /web|url|site|domain/i.test(f.key || ''))?.text?.value;
   if (!target) return json({ error: 'We could not find a website address on this order. Reply to your receipt email with it and we will send your report.' }, 422);
   try {
-    const report = await runAudit(target, { pagespeedKey: config.pagespeedKey, budgetMs: 25000 });
+    const report = await runAudit(target, { pagespeedKey: config.pagespeedKey, budgetMs: config.auditBudgetMs });
     return json({
       html: renderReportBody(report),
       score: report.score, grade: report.grade, host: report.host,

@@ -2,13 +2,18 @@
   "name": "enamel-audits",
   "version": "1.0.0",
   "private": true,
-  "description": "Fully automated website health reports for dental practices: free snapshot, paid report, monthly monitoring. Stripe + Resend + Vercel, zero runtime dependencies.",
+  "description": "Fully automated website health reports for dental practices on a zero-cost stack: Netlify free + Stripe + Gmail SMTP, no database, no custom domain.",
   "type": "module",
-  "engines": { "node": ">=20.6" },
+  "engines": {
+    "node": ">=20.6"
+  },
   "scripts": {
     "dev": "node --env-file-if-exists=.env server.js",
     "test": "node --test test/*.test.js",
     "audit": "node scripts/audit.js",
-    "deploy": "npx vercel@latest deploy --prod"
+    "deploy": "npx netlify-cli deploy --prod"
+  },
+  "dependencies": {
+    "nodemailer": "10.2.1"
   }
 }

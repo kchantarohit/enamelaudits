@@ -44,3 +44,11 @@ test('snapshot hides fixes and caps at 3 issues', async () => {
 test('grades', () => {
   assert.equal(gradeFor(95), 'A'); assert.equal(gradeFor(68), 'D'); assert.equal(gradeFor(10), 'F');
 });
+
+test('audit respects its time budget even when the site hangs', async () => {
+  const t0 = Date.now();
+  const r = await runAudit(`${srv.base}/slow/`, { budgetMs: 4000 });
+  const took = Date.now() - t0;
+  assert.ok(took < 5500, `took ${took}ms`);
+  assert.ok(Number.isFinite(r.score));
+});

@@ -1,6 +1,7 @@
 // GET /api/health -> which integrations are configured (booleans only, no secrets)
 import { config } from '../lib/config.js';
 import { json } from '../lib/http.js';
+import { emailProvider } from '../lib/email.js';
 
 export function GET() {
   return json({
@@ -8,9 +9,9 @@ export function GET() {
     stripe: Boolean(config.stripeKey),
     stripeMode: config.stripeKey.startsWith('sk_live') || config.stripeKey.startsWith('rk_live') ? 'live' : config.stripeKey ? 'test' : null,
     webhook: Boolean(config.stripeWebhookSecret),
-    email: Boolean(config.resendKey),
+    email: emailProvider(), // 'gmail' | 'resend' | null
     ownerAlerts: Boolean(config.ownerEmail),
-    cron: Boolean(config.cronSecret),
+    cronSecret: Boolean(config.cronSecret), // only needed for the HTTP /api/cron endpoint (Vercel / manual)
     pagespeed: Boolean(config.pagespeedKey),
     siteUrl: config.siteUrl || null,
   });

@@ -1,0 +1,19 @@
+# Netlify free ("Free"/Starter) plan: commercial use allowed, default *.netlify.app domain, no card needed.
+[build]
+  publish = "public"
+  command = ""   # no build step: static files + functions (run `npm test` locally before deploying)
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"

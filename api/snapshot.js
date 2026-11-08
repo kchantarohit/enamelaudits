@@ -3,7 +3,7 @@ import { runAudit, toSnapshot } from '../lib/audit.js';
 import { json, readJson, clientIp, isEmail, rateLimited } from '../lib/http.js';
 import { sendEmail, notifyOwner } from '../lib/email.js';
 import { renderSnapshotEmail } from '../lib/render.js';
-import { siteUrlFrom } from '../lib/config.js';
+import { config, siteUrlFrom } from '../lib/config.js';
 
 export async function POST(request) {
   let body;
@@ -16,7 +16,7 @@ export async function POST(request) {
 
   let snapshot;
   try {
-    snapshot = toSnapshot(await runAudit(url, { budgetMs: 20000 }));
+    snapshot = toSnapshot(await runAudit(url, { budgetMs: config.auditBudgetMs }));
   } catch (e) {
     return json({ error: e.code ? e.message : 'Sorry, we could not check that website. Please check the address and try again.' }, 422);
   }
