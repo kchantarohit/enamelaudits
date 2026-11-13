@@ -498,7 +498,11 @@ export async function runAudit(rawUrl: string): Promise<AuditResult> {
   else checks.push(r("copyright_year", "warn", `Footer still says ${maxYear}.`));
 
   const analytics = ANALYTICS_MARKERS.find((m) => htmlLower.includes(m));
-  checks.push(analytics ? r("analytics", "pass", `Analytics found (${analytics.replace(/[.(']+$/, "")}).`) : r("analytics", "fail", "No analytics or tag manager found."));
+  checks.push(
+    analytics
+      ? r("analytics", "pass", `Analytics found (${analytics.replace(/[.(']+$/, "")}).`)
+      : r("analytics", "warn", "No analytics or tag manager found in the page code. If you're not measuring visits, calls and bookings, set this up."),
+  );
 
   const privacy = linkBlobs.some((b) => /privacy/.test(b));
   checks.push(privacy ? r("privacy_policy", "pass", "Privacy policy is linked.") : r("privacy_policy", "fail", "No privacy policy link found."));
