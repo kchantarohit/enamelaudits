@@ -26,12 +26,21 @@ if (a.unsubscribe) {
 
 const SEND = !!a.send;
 const LIMIT = Number(a.limit || 25);
-const FROM_NAME = env("SENDER_NAME", "Enamel Audits");
+const FROM_NAME = env("SENDER_NAME", "The Enamel Audits team");
 const ADDRESS = env("SENDER_ADDRESS", "136 Sukhumvit St, Pattaya, Chonburi 20150 Thailand");
 const CAMPAIGN = String(a.campaign || today());
 
 function firstName(lead) {
   return (lead.first_name || "").trim() || "there";
+}
+
+/** Only repeat the detail line when it says something the issue title doesn't. */
+function addsInfo(issue) {
+  const norm = (x) => x.toLowerCase().replace(/[^a-z0-9 ]/g, "");
+  const d = norm(issue.detail);
+  const words = norm(issue.issue).split(" ").filter((w) => w.length > 3);
+  const overlap = words.filter((w) => d.includes(w)).length;
+  return words.length === 0 || overlap / words.length < 0.7;
 }
 
 function initialEmail(lead, audit) {
@@ -44,8 +53,8 @@ function initialEmail(lead, audit) {
     ``,
     `I ran ${audit.domain} through our dental website checker and it scored ${audit.score}/100 (grade ${audit.grade}).`,
     ``,
-    top ? `The biggest thing it flagged: ${top.issue.toLowerCase()}. ${top.detail}` : `It found a few things worth tightening up.`,
-    second ? `It also noticed: ${second.issue.toLowerCase()}.` : ``,
+    top ? `The biggest thing it flagged: "${top.issue}."${addsInfo(top) ? ` ${top.detail}` : ""}` : `It found a few things worth tightening up.`,
+    second ? `It also noticed: "${second.issue}."` : ``,
     ``,
     `Your free summary is here (no login or signup): ${audit.reportUrl}`,
     ``,

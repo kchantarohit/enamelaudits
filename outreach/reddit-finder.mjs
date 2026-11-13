@@ -52,7 +52,7 @@ async function auth() {
 
 async function search(sub, q) {
   const host = token ? "https://oauth.reddit.com" : "https://www.reddit.com";
-  const url = `${host}/r/${sub}/search.json?q=${encodeURIComponent(q)}&restrict_sr=1&sort=new&t=${days <= 7 ? "week" : "month"}&limit=25`;
+  const url = `${host}/r/${sub}/search.json?q=${encodeURIComponent(q)}&restrict_sr=1&sort=new&t=${days <= 7 ? "week" : "month"}&limit=50`;
   const res = await fetch(url, { headers: { "user-agent": UA, ...(token ? { authorization: `Bearer ${token}` } : {}) } });
   if (!res.ok) return [];
   const data = await res.json().catch(() => null);
@@ -62,14 +62,14 @@ async function search(sub, q) {
 token = await auth();
 const cutoff = Date.now() / 1000 - days * 86400;
 const seen = new Map();
+// One combined OR query per subreddit keeps us well inside Reddit's rate limits.
+const combined = QUERIES.join(" OR ");
 for (const sub of SUBREDDITS) {
-  for (const q of QUERIES) {
-    for (const p of await search(sub, q)) {
-      if (p.created_utc < cutoff || seen.has(p.id) || p.locked || p.archived) continue;
-      seen.set(p.id, p);
-    }
-    await sleep(token ? 700 : 2200);
+  for (const p of await search(sub, combined)) {
+    if (p.created_utc < cutoff || seen.has(p.id) || p.locked || p.archived) continue;
+    seen.set(p.id, p);
   }
+  await sleep(token ? 700 : 2500);
 }
 
 const threads = [...seen.values()].sort((x, y) => y.num_comments - x.num_comments || y.created_utc - x.created_utc);
