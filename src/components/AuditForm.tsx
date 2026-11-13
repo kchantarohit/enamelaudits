@@ -34,7 +34,7 @@ export function AuditForm({ compact = false, source }: { compact?: boolean; sour
     setBusy(true);
     setStep(0);
     try {
-      const ref = source || new URLSearchParams(window.location.search).get("ref") || undefined;
+      const ref = new URLSearchParams(window.location.search).get("ref") || source || undefined;
       const res = await fetch("/api/audit", {
         method: "POST",
         headers: { "content-type": "application/json" },

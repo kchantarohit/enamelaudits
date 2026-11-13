@@ -37,7 +37,7 @@ export default async function ReportPage(props: PageProps<"/report/[id]">) {
   const fixItMail = `mailto:${SITE.contactEmail}?subject=${encodeURIComponent(`Fix-It quote for ${audit.domain}`)}&body=${encodeURIComponent(`Hi, please quote fixing the issues in this report: ${SITE.url}/report/${audit.id}`)}`;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
+    <div className={`mx-auto max-w-5xl px-4 py-10 ${audit.paid ? "" : "pb-28 sm:pb-10"}`}>
       {sp.canceled && !paid && (
         <p className="no-print mb-6 rounded-lg bg-amber-50 p-3 text-sm text-warn">Checkout was canceled. Your free results are still here whenever you&apos;re ready.</p>
       )}
@@ -177,6 +177,11 @@ export default async function ReportPage(props: PageProps<"/report/[id]">) {
         {" "}Questions? <a className="underline" href={`mailto:${SITE.contactEmail}`}>{SITE.contactEmail}</a>
       </p>
       <p className="no-print mt-4 text-sm"><Link className="underline" href="/#audit">Check another website</Link></p>
+      {!paid && issues.length > 0 && (
+        <div className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 p-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur sm:hidden">
+          <a href={unlockHref} className="btn btn-primary w-full">Unlock all {issues.length} fixes: ${SITE.reportPrice}</a>
+        </div>
+      )}
     </div>
   );
 }
