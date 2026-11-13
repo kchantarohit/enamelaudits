@@ -36,6 +36,7 @@ const TOPICS = [
 ];
 
 let token = null;
+const blocked = [];
 async function auth() {
   if (!process.env.REDDIT_CLIENT_ID || !process.env.REDDIT_CLIENT_SECRET) return null;
   const res = await fetch("https://www.reddit.com/api/v1/access_token", {
@@ -54,7 +55,10 @@ async function search(sub, q) {
   const host = token ? "https://oauth.reddit.com" : "https://www.reddit.com";
   const url = `${host}/r/${sub}/search.json?q=${encodeURIComponent(q)}&restrict_sr=1&sort=new&t=${days <= 7 ? "week" : "month"}&limit=50`;
   const res = await fetch(url, { headers: { "user-agent": UA, ...(token ? { authorization: `Bearer ${token}` } : {}) } });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    blocked.push(res.status);
+    return [];
+  }
   const data = await res.json().catch(() => null);
   return data?.data?.children?.map((c) => c.data) || [];
 }
@@ -70,6 +74,15 @@ for (const sub of SUBREDDITS) {
     seen.set(p.id, p);
   }
   await sleep(token ? 700 : 2500);
+}
+
+if (blocked.length) {
+  console.warn(
+    `\nReddit refused ${blocked.length}/${SUBREDDITS.length} searches (HTTP ${[...new Set(blocked)].join(", ")}). ` +
+      (token
+        ? "Check your Reddit app credentials."
+        : "Reddit blocks anonymous requests from cloud servers (incl. GitHub Actions). Run this from your own computer, or set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET (free 'script' app at reddit.com/prefs/apps)."),
+  );
 }
 
 const threads = [...seen.values()].sort((x, y) => y.num_comments - x.num_comments || y.created_utc - x.created_utc);

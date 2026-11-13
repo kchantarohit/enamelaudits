@@ -6,7 +6,7 @@ Everything here pushes traffic to **https://enamelaudits.vercel.app** with a `?r
 | --- | --- | --- |
 | Cold email (highest intent) | `find-leads.mjs` → `cold-email.mjs` | Drafts automatically; you review, then `--send` |
 | X / Twitter | `x-post.mjs` + `content/x-posts.json` (24 tips) | Yes: daily via `.github/workflows/social.yml` |
-| Reddit | `reddit-finder.mjs` | Finds threads + drafts replies weekly; **you post by hand** |
+| Reddit | `reddit-finder.mjs` | Finds threads + drafts replies weekly; **you post by hand**. Needs Reddit API keys on servers/CI (Reddit blocks anonymous cloud requests). |
 | Launch posts | `content/launch-posts.md` | Copy/paste (SideProject, Indie Hackers, LinkedIn, FB groups) |
 | SEO (passive) | 44 `/guides/*`, 8 `/for/*`, schema generator, sitemap | Live; submit sitemap in Google Search Console |
 
