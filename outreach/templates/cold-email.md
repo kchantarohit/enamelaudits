@@ -1,6 +1,6 @@
 # Cold email templates (ready to use)
 
-Use these by hand (Gmail, Outlook) or let `outreach/cold-email.mjs` fill them in automatically.
+Use these by hand (Gmail, Outlook). `outreach/gmail-outreach.mjs` sends template 1/2 automatically (copy in `outreach/email-template.mjs`).
 Before every email, run the practice's site through **https://enamelaudits.vercel.app/?ref=email** (or let the script do it)
 so the email quotes **real findings** and links to **their own free report**. That link is what gets replies.
 
@@ -146,7 +146,7 @@ No catch. The summary is free. The full report is a one-time $97: every issue in
 ```
 Fair question! I'm {{your_name}}. I run Enamel Audits, which checks dental practice websites. I found your email listed on {{domain}} and ran your public homepage through our checker (nothing private, only what any patient can see). Happy to remove you; just say the word.
 ```
-(Then add them to the suppression list: `node outreach/cold-email.mjs --unsubscribe their@email.com`.)
+(Then add them to the suppression list: `node outreach/gmail-outreach.mjs --suppress their@email.com`.)
 
 **"Our agency handles that"**
 ```

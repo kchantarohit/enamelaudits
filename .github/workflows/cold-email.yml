@@ -1,0 +1,60 @@
+name: Daily cold email
+
+# Sends personalized audit emails to queued dental clinics through Gmail.
+# Scheduled runs only happen when the repository variable OUTREACH_ENABLED is "true".
+# Manual runs (Actions tab → Run workflow) work any time; pick verify / dry-run / send.
+
+on:
+  schedule:
+    - cron: "7 15 * * 1-5" # Mon–Fri 15:07 UTC ≈ 10am US Eastern
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "verify = test Gmail login, dry-run = preview only, send = send emails"
+        type: choice
+        options: [verify, dry-run, send, stats]
+        default: verify
+      limit:
+        description: "Max emails this run (the database never allows more than 20 per 24 h)"
+        default: "15"
+
+concurrency:
+  group: cold-email
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  outreach:
+    if: github.event_name == 'workflow_dispatch' || vars.OUTREACH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run outreach
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          OUTREACH_TOKEN: ${{ secrets.OUTREACH_TOKEN }}
+          SENDER_NAME: ${{ vars.SENDER_NAME }}
+          SENDER_ADDRESS: ${{ vars.SENDER_ADDRESS }}
+          REPLY_TO: ${{ vars.REPLY_TO }}
+          MODE: ${{ github.event.inputs.mode || 'send' }}
+          LIMIT: ${{ github.event.inputs.limit || vars.OUTREACH_DAILY_LIMIT || '15' }}
+        run: |
+          case "$MODE" in
+            verify)  node outreach/gmail-outreach.mjs --verify ;;
+            dry-run) node outreach/gmail-outreach.mjs --limit "$LIMIT" ;;
+            send)    node outreach/gmail-outreach.mjs --send --limit "$LIMIT" ;;
+            stats)   node outreach/gmail-outreach.mjs --stats ;;
+            *) echo "Unknown mode $MODE"; exit 1 ;;
+          esac
