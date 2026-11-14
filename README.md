@@ -10,7 +10,8 @@ instantly for **$97** via Stripe Checkout. Upsells: **$29/mo** monitoring (month
 
 - **Next.js 16** (App Router) + **Tailwind CSS 4** on **Vercel** (daily cron for monitoring)
 - **Supabase** Postgres: tables live in a `private` schema; the app only calls `SECURITY DEFINER` RPC functions
-  that require `APP_SECRET` (only its SHA-256 is stored in the DB). See `supabase/migrations/0001_init.sql`.
+  that are executable only by `service_role` (the Supabase secret key) and also require `APP_SECRET` (only its SHA-256
+  is stored in the DB). See `supabase/migrations/`.
 - **Stripe Checkout** via Payment Links tagged with `client_reference_id=<audit id>`, fulfilled by a signed webhook
   (`/api/stripe/webhook`). If `STRIPE_SECRET_KEY` is set, dynamic Checkout Sessions are used instead.
 
