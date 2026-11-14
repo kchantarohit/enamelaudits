@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { runAudit } from "@/lib/audit/engine";
 import { AuditError } from "@/lib/audit/safe-fetch";
-import { rankIssues } from "@/lib/audit/score";
+import { rankIssues, severityOf } from "@/lib/audit/score";
 import { CHECK_BY_ID } from "@/lib/audit/catalog";
 import { createAudit } from "@/lib/db";
 import { reportUrl } from "@/lib/fulfil";
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   try {
     const result = await runAudit(String(url || ""));
     const id = await createAudit({ url: String(url), result, business_name: business || null, source: `outreach:${(campaign || "default").slice(0, 30)}` });
-    const issues = rankIssues(result.checks).map((c) => ({ id: c.id, status: c.status, issue: CHECK_BY_ID[c.id].issue, detail: c.detail }));
+    const issues = rankIssues(result.checks).map((c) => ({ id: c.id, status: c.status, severity: severityOf(c), issue: CHECK_BY_ID[c.id].issue, detail: c.detail }));
     return NextResponse.json({
       id,
       reportUrl: reportUrl(id),
@@ -27,6 +27,8 @@ export async function POST(req: Request) {
       platform: result.meta.platform,
       issueCount: issues.length,
       topIssues: issues.slice(0, 3),
+      // Every failed/warned check, so the email can lead with the most patient-relevant one.
+      issues,
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof AuditError ? e.message : "audit failed" }, { status: 422 });

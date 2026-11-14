@@ -6,11 +6,13 @@
 //   node outreach/gmail-outreach.mjs                          # dry run: audit the next leads and preview emails
 //   node outreach/gmail-outreach.mjs --test-to you@gmail.com --site https://some-dental-site.com   # one sample to yourself
 //   node outreach/gmail-outreach.mjs --send [--limit 15]      # send today's batch
+//   node outreach/gmail-outreach.mjs --send --limit 1 --business-hours   # hourly GitHub Action: 1 email, weekdays 9-5 Central
 //   node outreach/gmail-outreach.mjs --suppress x@clinic.com  # never contact this email or domain
 //   node outreach/gmail-outreach.mjs --stats                  # queue status
 //   node outreach/gmail-outreach.mjs --prepare --limit 15     # write emails for Gmail drafts instead of sending
 //
-// Safety: max 20 emails per rolling 24 h (enforced in the database, across all runs);
+// Safety: max 20 emails per rolling 24 h AND max OUTREACH_DAY_CAP (default 9) per calendar day in
+// OUTREACH_TZ (default America/Chicago), both enforced in the database across all runs;
 // each clinic (email AND domain) can be emailed only once; suppressed addresses are skipped;
 // every email has your address, a one-click unsubscribe link and a List-Unsubscribe header.
 //
@@ -20,14 +22,24 @@
 import fs from "node:fs";
 import path from "node:path";
 import { OUT, args, auditViaApi, domainOf, env, jitter, loadEnv, readCsv, sleep, today } from "./lib.mjs";
-import { renderEmail } from "./email-template.mjs";
+import { prospectQuality, renderCustom, renderEmail } from "./email-template.mjs";
 
 loadEnv();
 const a = args();
 const LIMIT = Math.min(20, Math.max(1, Number(a.limit || process.env.OUTREACH_DAILY_LIMIT || 15)));
-const DAILY_CAP = 20;
+const DAILY_CAP = 20; // rolling 24 h, hard ceiling
+const DAY_CAP = Math.min(20, Math.max(1, Number(a["day-cap"] || process.env.OUTREACH_DAY_CAP || 9))); // per calendar day
+const TZ = process.env.OUTREACH_TZ || "America/Chicago";
 const MIN_ISSUES = 3;
 const MAX_SCORE = 89;
+const nextArgs = (limit) => ({ limit, dailyCap: DAILY_CAP, dayCap: DAY_CAP, tz: TZ });
+
+/** Mon-Fri, 9:00-17:59 in TZ (US Central by default): when clinics read email. */
+function inBusinessHours(d = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(d).map((p) => [p.type, p.value]));
+  const hour = Number(parts.hour);
+  return !["Sat", "Sun"].includes(parts.weekday) && hour >= 9 && hour < 18;
+}
 const sender = {
   name: process.env.SENDER_NAME || "The Enamel Audits team",
   address: process.env.SENDER_ADDRESS || "136 Sukhumvit St, Pattaya, Chonburi 20150 Thailand",
@@ -167,7 +179,7 @@ if (a["mark-sent"]) {
 }
 
 if (a.prepare) {
-  const batch = await api("next", { limit: LIMIT, dailyCap: DAILY_CAP });
+  const batch = await api("next", nextArgs(LIMIT));
   console.log(`Claimed ${batch.contacts.length} clinic(s) (sent in last 24h: ${batch.sent_24h}).`);
   const prepared = [];
   await Promise.all(
@@ -177,9 +189,10 @@ if (a.prepare) {
         try {
           const audit = await auditViaApi(c.website, c.name || "", "gmail-draft");
           const data = { audit_id: audit.id, score: audit.score, grade: audit.grade, issue_count: audit.issueCount, report_url: audit.reportUrl };
-          if (audit.score > MAX_SCORE || audit.issueCount < MIN_ISSUES) {
-            await api("result", { id: c.id, status: "skipped", data: { ...data, error: "score too high / too few issues" } });
-            console.log(`- ${c.domain}: ${audit.score}/100, ${audit.issueCount} issues; skipped`);
+          const q = prospectQuality(audit, { maxScore: MAX_SCORE, minIssues: MIN_ISSUES });
+          if (!q.ok) {
+            await api("result", { id: c.id, status: "skipped", data: { ...data, error: q.reason } });
+            console.log(`- ${c.domain}: ${audit.score}/100, ${audit.issueCount} issues; skipped (${q.reason})`);
             continue;
           }
           const msg = renderEmail({ lead: c, audit, sender, unsubscribeUrl: c.unsubscribeUrl });
@@ -199,13 +212,17 @@ if (a.prepare) {
 }
 
 const SEND = !!a.send;
-console.log(`Mode: ${SEND ? "SEND" : "DRY RUN (no emails, no queue changes)"} · limit ${LIMIT} · cap ${DAILY_CAP}/24h`);
+console.log(`Mode: ${SEND ? "SEND" : "DRY RUN (no emails, no queue changes)"} · limit ${LIMIT} · cap ${DAY_CAP}/day (${TZ}), ${DAILY_CAP}/24h`);
+if (a["business-hours"] && !inBusinessHours()) {
+  console.log(`Outside business hours in ${TZ} (Mon-Fri 9:00-17:59); nothing sent this run.`);
+  process.exit(0);
+}
 
 const transport = SEND ? await gmail() : null;
 if (transport) await transport.verify();
 
-const batch = SEND ? await api("next", { limit: LIMIT, dailyCap: DAILY_CAP }) : { contacts: (await api("peek", { limit: LIMIT })).contacts };
-if (SEND) console.log(`Sent in last 24h before this run: ${batch.sent_24h}. Claimed ${batch.contacts.length} clinic(s).`);
+const batch = SEND ? await api("next", nextArgs(LIMIT)) : { contacts: (await api("peek", { limit: LIMIT })).contacts };
+if (SEND) console.log(`Sent today: ${batch.sent_today ?? "?"} (last 24h: ${batch.sent_24h}). Claimed ${batch.contacts.length} clinic(s).`);
 if (!batch.contacts.length) {
   console.log(SEND ? "Nothing to send (queue empty or daily cap reached)." : "Queue is empty. Add leads with --enqueue leads.csv");
   process.exit(0);
@@ -218,6 +235,35 @@ let failed = 0;
 
 for (let i = 0; i < batch.contacts.length; i++) {
   const c = batch.contacts[i];
+  if (c.custom_body && c.custom_subject) {
+    // Hand-checked copy (e.g. a former Gmail draft): send it as written, with the standard footer.
+    const msg = renderCustom({ subject: c.custom_subject, body: c.custom_body, sender, unsubscribeUrl: c.unsubscribeUrl });
+    const data = { audit_id: c.audit_id || "", score: c.score, grade: c.grade, issue_count: c.issue_count, report_url: c.report_url };
+    if (!SEND) {
+      if (!process.env.CI) fs.appendFileSync(previewFile, `\n---\nTO: ${c.email}\nSUBJECT: ${msg.subject}\n\n${msg.text}\n`);
+      console.log(`- would email ${mask(c.email)} · ${c.domain} (hand-checked copy) · "${msg.subject}"`);
+      continue;
+    }
+    try {
+      const messageId = await sendOne(transport, c.email, msg, c);
+      await api("result", { id: c.id, status: "sent", data: { ...data, message_id: messageId } });
+      sent++;
+      console.log(`✓ sent ${mask(c.email)} · ${c.domain} (hand-checked copy)`);
+    } catch (e) {
+      failed++;
+      console.log(`✗ ${c.domain}: ${e.message}`);
+      await api("result", { id: c.id, status: "failed", data: { error: String(e.message).slice(0, 300) } }).catch(() => {});
+      if (e.code === "EAUTH" || /auth|credentials|login/i.test(e.message || "")) {
+        for (const rest of batch.contacts.slice(i + 1)) {
+          await api("result", { id: rest.id, status: "failed", data: { error: "run stopped before sending (Gmail login problem)" } }).catch(() => {});
+        }
+        console.log("Stopping: Gmail rejected the login. Fix the credentials, then re-run.");
+        break;
+      }
+    }
+    if (i < batch.contacts.length - 1) await sleep(jitter(Number(a["delay-min"] || 60) * 1000, Number(a["delay-max"] || 150) * 1000));
+    continue;
+  }
   let audit;
   try {
     audit = await auditViaApi(c.website, c.name || "", "gmail");
@@ -228,9 +274,10 @@ for (let i = 0; i < batch.contacts.length; i++) {
     continue;
   }
   const auditData = { audit_id: audit.id, score: audit.score, grade: audit.grade, issue_count: audit.issueCount, report_url: audit.reportUrl };
-  if (audit.score > MAX_SCORE || audit.issueCount < MIN_ISSUES) {
-    console.log(`- ${c.domain}: ${audit.score}/100 with ${audit.issueCount} issue(s), not worth emailing; skipping`);
-    if (SEND) await api("result", { id: c.id, status: "skipped", data: { ...auditData, error: "score too high / too few issues" } });
+  const quality = prospectQuality(audit, { maxScore: MAX_SCORE, minIssues: MIN_ISSUES });
+  if (!quality.ok) {
+    console.log(`- ${c.domain}: ${audit.score}/100 with ${audit.issueCount} issue(s), not worth emailing (${quality.reason}); skipping`);
+    if (SEND) await api("result", { id: c.id, status: "skipped", data: { ...auditData, error: quality.reason } });
     skipped++;
     continue;
   }

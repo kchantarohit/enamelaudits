@@ -128,6 +128,14 @@ export interface OutreachContact {
   city: string | null;
   status: string;
   attempts: number;
+  audit_id?: string | null;
+  score?: number | null;
+  grade?: string | null;
+  issue_count?: number | null;
+  report_url?: string | null;
+  /** Hand-checked copy (migration 0004); when set, the sender uses it instead of the template. */
+  custom_subject?: string | null;
+  custom_body?: string | null;
 }
 
 export interface OutreachLead {
@@ -138,13 +146,28 @@ export interface OutreachLead {
   first_name?: string;
   city?: string;
   source?: string;
+  /** "skipped" records a clinic the lead finder screened out (never emailed, never re-audited). */
+  status?: "queued" | "skipped";
+  score?: number | null;
+  grade?: string;
+  issue_count?: number | null;
+  reason?: string;
 }
 
 export const outreachEnqueue = (rows: OutreachLead[]) =>
-  rpc<{ inserted: number; skipped: number }>("ea_outreach_enqueue", { p_rows: rows });
+  rpc<{ inserted: number; queued?: number; skipped: number }>("ea_outreach_enqueue", { p_rows: rows });
+export const outreachKnown = (domains: string[]) => rpc<string[]>("ea_outreach_known", { p_domains: domains });
 export const outreachPeek = (limit: number) => rpc<OutreachContact[]>("ea_outreach_peek", { p_limit: limit });
 export const outreachNext = (limit: number, dailyCap: number) =>
   rpc<{ contacts: OutreachContact[]; sent_24h: number; remaining_24h: number }>("ea_outreach_next", { p_limit: limit, p_daily_cap: dailyCap });
+/** Like outreachNext, plus a cap per calendar day in `tz` (migration 0004). */
+export const outreachNextDay = (limit: number, dailyCap: number, dayCap: number, tz: string) =>
+  rpc<{ contacts: OutreachContact[]; sent_24h: number; sent_today: number; remaining_today: number }>("ea_outreach_next2", {
+    p_limit: limit,
+    p_daily_cap: dailyCap,
+    p_day_cap: dayCap,
+    p_tz: tz,
+  });
 export const outreachResult = (id: string, status: "sent" | "skipped" | "failed", data: Record<string, unknown>) =>
   rpc<null>("ea_outreach_result", { p_id: id, p_status: status, p_data: data });
 export const outreachSuppress = (value: string, reason: string) => rpc<null>("ea_outreach_suppress", { p_value: value, p_reason: reason });
