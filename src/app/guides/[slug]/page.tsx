@@ -42,7 +42,7 @@ export default async function GuidePage(props: PageProps<"/guides/[slug]">) {
         <p className="text-sm font-semibold uppercase tracking-wide text-brand">
           <Link href="/guides">Guides</Link> · {CATEGORY_META[c.category].label}
         </p>
-        <h1 className="mt-2 text-4xl font-extrabold leading-tight">{c.guideTitle}</h1>
+        <h1 className="mt-2 text-3xl font-extrabold leading-tight sm:text-4xl">{c.guideTitle}</h1>
         <p className="mt-4 text-lg">{c.guideDescription}</p>
 
         <h2>Why it matters for your practice</h2>

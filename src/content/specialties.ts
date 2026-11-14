@@ -163,6 +163,82 @@ export const SPECIALTIES: Specialty[] = [
       "Do you explain what a root canal involves to calm nervous patients?",
     ],
   },
+  {
+    slug: "emergency-dentists",
+    singular: "emergency dental practice",
+    plural: "Emergency dentists",
+    headline: "Website health check for emergency dental practices",
+    intro: "Emergency dental patients don't browse. They're in pain, on a phone, often outside office hours, and they call the first practice that loads quickly and makes it obvious they can be seen today.",
+    patientMoment: "Someone cracks a tooth on a Saturday morning and searches 'emergency dentist near me'. They'll tap the first result that loads fast, says 'same-day appointments' and lets them call with one tap.",
+    priorities: [
+      { check: "tel_link", reason: "Emergency patients call. The number must be tappable and in the mobile header." },
+      { check: "server_response", reason: "A blank screen for a few seconds sends a patient in pain straight back to Google." },
+      { check: "hours", reason: "'Are they open right now?' is the first question; weekend and after-hours info must be visible." },
+      { check: "noindex", reason: "Emergency pages that aren't indexed can't be found when it matters most." },
+    ],
+    extra: [
+      "Does your home page say 'same-day emergency appointments' above the fold?",
+      "Is there an after-hours number or instructions for weekends?",
+      "Does your emergency page have its own title, e.g. 'Emergency Dentist in [Town]'?",
+    ],
+  },
+  {
+    slug: "prosthodontists",
+    singular: "prosthodontist",
+    plural: "Prosthodontists",
+    headline: "Website health check for prosthodontic practices",
+    intro: "Prosthodontic cases (dentures, implants, full-mouth reconstruction) are complex and high-value. Patients and referring dentists research carefully, so your site needs to explain the specialty clearly, load well on any device, and make consultations easy to request.",
+    patientMoment: "A patient told they need full-mouth reconstruction looks you up after a referral. They want to understand what a prosthodontist does, see results, check financing, and book a consultation.",
+    priorities: [
+      { check: "insurance_info", reason: "Financing and insurance are central to whether complex cases go ahead." },
+      { check: "image_weight", reason: "Before-and-after galleries are often the heaviest part of the site." },
+      { check: "online_booking", reason: "Consultation requests should be easy from any page." },
+      { check: "zoom_enabled", reason: "Many denture and implant patients are older and rely on pinch-to-zoom." },
+    ],
+    extra: [
+      "Do you explain what a prosthodontist is, and how it differs from a general dentist?",
+      "Is there a clear path for referring dentists?",
+      "Are your credentials and case examples easy to find?",
+    ],
+  },
+  {
+    slug: "sedation-dentists",
+    singular: "sedation dentistry practice",
+    plural: "Sedation dentists",
+    headline: "Website health check for sedation dentistry practices",
+    intro: "Anxious patients often research for a long time before they book. Reassurance, clarity and a low-pressure way to get in touch matter more than anywhere else, and so does a site that feels trustworthy and current.",
+    patientMoment: "Someone who hasn't seen a dentist in ten years because of anxiety reads your site late at night. They want to know what sedation options exist, whether it's safe, what it costs, and whether they can ask a question without phoning.",
+    priorities: [
+      { check: "contact_form", reason: "Anxious patients often prefer sending a message to making a call." },
+      { check: "reviews", reason: "Stories from other nervous patients are the strongest reassurance." },
+      { check: "https", reason: "A 'Not secure' warning is the last thing an anxious patient needs to see." },
+      { check: "copyright_year", reason: "An out-of-date footer undermines trust in everything else on the page." },
+    ],
+    extra: [
+      "Do you explain each sedation option in plain, calm language?",
+      "Is there a gentle 'ask a question' option alongside booking?",
+      "Is pricing or financing for sedation explained?",
+    ],
+  },
+  {
+    slug: "multi-location-dental-groups",
+    singular: "multi-location dental group",
+    plural: "Multi-location dental groups",
+    headline: "Website health check for multi-location dental groups and DSOs",
+    intro: "With several offices, small website issues multiply: one wrong phone number, one location missing from Google, one broken booking link per office. A consistent check across locations catches what manual reviews miss.",
+    patientMoment: "A patient searches 'dentist near me' and lands on your group's site. They need to find the closest office, its hours and phone number, and book at that location, without getting lost.",
+    priorities: [
+      { check: "local_schema", reason: "Each location needs accurate structured data that matches its own Business Profile." },
+      { check: "address_visible", reason: "Every office's address must be clear, consistent and correct." },
+      { check: "broken_links", reason: "Location pages and booking links break as offices open, move or close." },
+      { check: "online_booking", reason: "Booking should go to the right office's schedule." },
+    ],
+    extra: [
+      "Does every location have its own page with unique title, address, phone and hours?",
+      "Do your location pages match each office's Google Business Profile exactly?",
+      "Monitoring tip: run the check on each location page monthly to catch drift.",
+    ],
+  },
 ];
 
 export const SPECIALTY_BY_SLUG: Record<string, Specialty> = Object.fromEntries(SPECIALTIES.map((s) => [s.slug, s]));
