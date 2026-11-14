@@ -1,0 +1,17 @@
+{
+  "captured_at": "2026-11-14",
+  "note": "Shipping setup before changing the domestic rate. Province list trimmed: the zone covers all 77 Thai provinces (TH-10 ... TH-96, TH-S).",
+  "profile": { "id": "gid://shopify/DeliveryProfile/120157831299", "name": "โปรไฟล์ทั่วไป", "default": true },
+  "locationGroup": { "id": "gid://shopify/DeliveryLocationGroup/118022635651" },
+  "zone": { "id": "gid://shopify/DeliveryZone/517154209923", "name": "Domestic", "countries": ["TH (all provinces)"] },
+  "methodDefinitions": [
+    {
+      "id": "gid://shopify/DeliveryMethodDefinition/991658442883",
+      "name": "Standard",
+      "active": true,
+      "description": null,
+      "rateDefinition": { "id": "gid://shopify/DeliveryRateDefinition/915628490883", "price": { "amount": "370.0", "currencyCode": "THB" } },
+      "methodConditions": []
+    }
+  ]
+}

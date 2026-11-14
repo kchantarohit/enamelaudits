@@ -2,6 +2,18 @@
 
 Every action taken against the store, newest first. Reads are listed so each finding can be traced.
 
+## 2026-11-14 — domestic shipping: ฿50, free from ฿1,000
+Approved by the owner. **Writes: 1 mutation.** Backup: `backups/2026-11-14-delivery-profile-before.json`
+
+| | Before | After |
+| --- | --- | --- |
+| Standard (`DeliveryMethodDefinition/991658442883`) | ฿370 on every order | ฿50, orders ฿0–฿999.99 |
+| Free Shipping (`DeliveryMethodDefinition/991681970307`) | did not exist | ฿0, orders ฿1,000+ |
+
+- Mutation: `deliveryProfileUpdate` on `DeliveryProfile/120157831299` (โปรไฟล์ทั่วไป), zone Domestic (all of Thailand). `userErrors: []`.
+- Verified by reading the profile back: both rates active, ranges don't overlap, so checkout shows one option.
+- Undo: delete `991681970307`, set Standard back to ฿370 and remove its price conditions.
+
 ## 2026-11-14 — read-only readiness check
 Store `mu1vju-uy.myshopify.com`. **Writes: none.**
 

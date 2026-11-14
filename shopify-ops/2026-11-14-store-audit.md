@@ -19,7 +19,7 @@ Mode: **read-only**. No store data was changed.
 | Store name | ร้านค้าของฉัน ("My Store"), Shopify's placeholder |
 | Store address | Country only, no city or street |
 | Locations | 1 (ตำแหน่งที่ตั้งของร้านค้า), fulfils online orders, no address |
-| Shipping | 1 zone, Thailand only: "Standard" at a flat **฿370** |
+| Shipping | 1 zone, Thailand only: "Standard" at a flat **฿370** (now ฿50, free from ฿1,000; see CHANGELOG) |
 | Taxes | Prices include tax |
 | Policies | Privacy policy only (Shopify's Thai template). No refund, shipping, terms or contact policy |
 | Pages | Contact (ติดต่อ) |
@@ -34,7 +34,7 @@ Mode: **read-only**. No store data was changed.
    *Needs from you:* what you sell, prices in THB, photos, sizes/colours, stock counts. I can write the listings, SEO, tags and collections from that.
 2. **Choose a paid plan.** You can't remove the password or take orders on the trial. *Only you can do this.*
 3. **Set up payments** (Settings → Payments). I couldn't see what's configured. Shopify Payments may not be offered in Thailand, so check which providers Shopify lists for you. Most Thai shoppers expect PromptPay QR; cash on delivery is also common.
-4. **Fix the shipping price.** A flat ฿370 for domestic delivery is very high for Thailand and will put people off at checkout. It looks like Shopify's default converted from USD. Suggested: about ฿40–60 standard, plus free shipping above a set order value once prices are known. *I can make this change once you approve it.*
+4. ✅ **Done 2026-11-14:** Standard is now ฿50, and orders of ฿1,000+ ship free (see CHANGELOG). ~~**Fix the shipping price.** A flat ฿370 for domestic delivery is very high for Thailand and will put people off at checkout. It looks like Shopify's default converted from USD. Suggested: about ฿40–60 standard, plus free shipping above a set order value once prices are known. *I can make this change once you approve it.*~~
 5. **Name the store.** ร้านค้าของฉัน is the placeholder, and it shows in the browser tab, checkout and every customer email.
 
 ### Should do before launch
