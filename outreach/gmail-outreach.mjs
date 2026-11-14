@@ -8,6 +8,7 @@
 //   node outreach/gmail-outreach.mjs --send [--limit 15]      # send today's batch
 //   node outreach/gmail-outreach.mjs --suppress x@clinic.com  # never contact this email or domain
 //   node outreach/gmail-outreach.mjs --stats                  # queue status
+//   node outreach/gmail-outreach.mjs --prepare --limit 15     # write emails for Gmail drafts instead of sending
 //
 // Safety: max 20 emails per rolling 24 h (enforced in the database, across all runs);
 // each clinic (email AND domain) can be emailed only once; suppressed addresses are skipped;
@@ -151,6 +152,49 @@ if (a["test-to"]) {
   const msg = renderEmail({ lead: { first_name: "", name: "" }, audit, sender });
   const id = await sendOne(await gmail(), String(a["test-to"]), { ...msg, subject: `[TEST] ${msg.subject}` });
   console.log(`✓ Test email sent to ${mask(a["test-to"])} (${audit.domain}: ${audit.score}/100, ${audit.issueCount} issues). Message-ID ${id}`);
+  process.exit(0);
+}
+
+// ---- Hand-off mode: prepare emails for Gmail drafts instead of sending them.
+//   --prepare [--limit N] [--out file.json]   claims + audits + writes emails (counts toward the 24 h cap)
+//   --mark-sent file.json                       records [{id, message_id, ...data}] as sent once the drafts exist
+// Claimed clinics that are never marked are parked as "failed" after 2 h and NOT re-sent automatically.
+if (a["mark-sent"]) {
+  const rows = JSON.parse(fs.readFileSync(path.resolve(String(a["mark-sent"])), "utf8"));
+  for (const r of rows) await api("result", { id: r.id, status: "sent", data: { ...r.data, message_id: r.message_id } });
+  console.log(`Recorded ${rows.length} clinic(s) as contacted.`);
+  process.exit(0);
+}
+
+if (a.prepare) {
+  const batch = await api("next", { limit: LIMIT, dailyCap: DAILY_CAP });
+  console.log(`Claimed ${batch.contacts.length} clinic(s) (sent in last 24h: ${batch.sent_24h}).`);
+  const prepared = [];
+  await Promise.all(
+    Array.from({ length: 3 }, async (_, w) => {
+      for (let i = w; i < batch.contacts.length; i += 3) {
+        const c = batch.contacts[i];
+        try {
+          const audit = await auditViaApi(c.website, c.name || "", "gmail-draft");
+          const data = { audit_id: audit.id, score: audit.score, grade: audit.grade, issue_count: audit.issueCount, report_url: audit.reportUrl };
+          if (audit.score > MAX_SCORE || audit.issueCount < MIN_ISSUES) {
+            await api("result", { id: c.id, status: "skipped", data: { ...data, error: "score too high / too few issues" } });
+            console.log(`- ${c.domain}: ${audit.score}/100, ${audit.issueCount} issues; skipped`);
+            continue;
+          }
+          const msg = renderEmail({ lead: c, audit, sender, unsubscribeUrl: c.unsubscribeUrl });
+          prepared.push({ id: c.id, to: c.email, domain: c.domain, subject: msg.subject, text: msg.text, data });
+          console.log(`✓ ${c.domain}: ${audit.score}/100 (${audit.grade}), ${audit.issueCount} fixes`);
+        } catch (e) {
+          await api("result", { id: c.id, status: "skipped", data: { error: `audit failed: ${e.message}` } }).catch(() => {});
+          console.log(`- ${c.domain}: audit failed (${e.message}); skipped`);
+        }
+      }
+    }),
+  );
+  const out = path.resolve(String(a.out || path.join(OUT, `prepared-${today()}.json`)));
+  fs.writeFileSync(out, JSON.stringify(prepared, null, 2));
+  console.log(`\n${prepared.length} email(s) ready -> ${out}\nCreate the drafts, then record them with --mark-sent.`);
   process.exit(0);
 }
 
