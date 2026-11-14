@@ -10,46 +10,43 @@ Everything here pushes traffic to **https://enamelaudits.vercel.app** with a `?r
 | Launch posts | `content/launch-posts.md` | Copy/paste (SideProject, Indie Hackers, LinkedIn) |
 | SEO (passive) | 44 `/guides/*`, 10 `/problems/*`, 6 `/platforms/*`, 12 `/for/*`, schema generator, sitemap | Live; submit the sitemap in Google Search Console |
 
-## Gmail outreach: how it works
+## Gmail outreach: hands-free (how it works)
 
-1. **Leads go into a queue in Supabase** (`private.outreach_contacts`). Each clinic is unique by **email and by domain**, so the same clinic can never be emailed twice, across any number of runs or machines.
-2. **Each run** claims the next leads, runs a **real audit** of each clinic's website, and emails them their score, grade, number of fixes and a link to **their own report**. That report page is where they pay $97 (it has the Stripe checkout button).
+Two GitHub Actions run everything; nothing needs your computer, and nothing needs you to click send.
+
+| Workflow | File | When (UTC cron) | What it does |
+|---|---|---|---|
+| **Daily lead finder** | `.github/workflows/find-leads.yml` | every day 10:41 UTC (~4:41am Central) | Picks one US state per day, loads its OpenStreetMap data (Geofabrik extract + osmium), keeps independent dental practices **outside cities of 50k+**, finds the email each one publishes on its own site, runs the real audit, and queues up to 12 strong prospects. Weak ones are recorded so they're never checked again. |
+| **Hourly cold email** | `.github/workflows/cold-email.yml` | Mon–Fri at :17 past each hour, 14:17–23:17 UTC | Sends **1 email per run**, only between **9:00 and 17:59 US Central**, max **9 per Central-time day** (and never more than 20 per rolling 24 h). Former Gmail drafts (hand-checked copy) go first, exactly as written. |
+
+1. **The queue lives in Supabase** (`private.outreach_contacts`). Each clinic is unique by **email and by domain**, so the same clinic can never be emailed twice, across any number of runs or machines.
+2. **Each send** runs a fresh audit of the clinic's website (unless the row carries hand-checked copy) and emails them their score, grade, number of fixes and a link to **their own report**. That report page is where they pay $97.
 3. **Safety rails:**
-   - At most 15 emails per run, and never more than **20 in any rolling 24 hours**. The database enforces this, so re-running can't exceed it.
-   - Sends are 60–150 s apart.
-   - Clinics scoring 90+ or with fewer than 3 issues are skipped (don't email someone a report with nothing to fix).
+   - Daily cap enforced in the database (per Central-time day and per rolling 24 h), so extra or overlapping runs can't exceed it.
+   - Only practices with a real, patient-facing problem are emailed (e.g. phone not tap-to-call, no booking button on the home page, http not redirecting to https, zoom blocked, slow server, missing Google basics). Sites scoring 90+ or with only security-header nits are skipped.
+   - Emails only claim what the home-page audit checked.
    - Every email carries your name, physical address, a one-click unsubscribe link and a `List-Unsubscribe` header. Unsubscribes go straight onto the permanent suppression list.
    - If a run crashes mid-send, the affected clinic is parked as `failed` rather than retried, because the email may already have gone out.
-   - Logs never print full email addresses (GitHub Actions logs are public on public repos).
+   - Logs never print email addresses (this repo is public, so Actions logs are public).
 
 ### One-time setup
 
 **1. Gmail app password** (works with @gmail.com and Google Workspace):
 Google Account → Security → turn on **2-Step Verification** → search **App passwords** → create one called "Enamel Audits" → copy the 16-character password.
-(Alternative: Gmail API OAuth2 with `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`. Note that refresh tokens from an OAuth app left in "Testing" mode expire after 7 days.)
+(Alternative: Gmail API OAuth2 with `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`. Refresh tokens from an OAuth app left in "Testing" mode expire after 7 days, so the app password is the hands-free choice.)
 
-**2. GitHub** → your repo → Settings → Secrets and variables → Actions:
-- *Secrets:* `GMAIL_USER` (your Gmail address), `GMAIL_APP_PASSWORD`, `OUTREACH_TOKEN` (same value as in Vercel)
-- *Variables:* `SENDER_NAME` (e.g. "Kim from Enamel Audits"), `SENDER_ADDRESS` (your postal address)
+**2. GitHub** → this repo → Settings → Secrets and variables → Actions:
+- *Secrets:* `GMAIL_USER` (your Gmail address), `GMAIL_APP_PASSWORD`, `OUTREACH_TOKEN` (same value as `OUTREACH_TOKEN` in Vercel)
+- *Variables:* `OUTREACH_ENABLED` = `true` (turns both schedules on), `SENDER_NAME`, `SENDER_ADDRESS` (your postal address, required by CAN-SPAM)
+- *Optional variables:* `OUTREACH_DAY_CAP` (default 9, keep ≤ 10), `LEADS_DAILY_TARGET` (default 12), `REPLY_TO`
 
-**3. Add leads** (from your computer, with `outreach/.env` filled in from `.env.example`):
-```bash
-node outreach/find-leads.mjs --city "Austin, TX" --max 60 --emails --enqueue   # Google Places → queue
-# or, from any CSV with columns name,first_name,email,website:
-node outreach/gmail-outreach.mjs --enqueue my-leads.csv
-```
+**3. Test once by hand:** Actions → **Hourly cold email** → Run workflow → `verify` (checks the Gmail login and site API, sends nothing), then **Daily lead finder** → Run workflow with *dry run* ticked.
 
-### Running it
-
-From GitHub → **Actions → "Daily cold email" → Run workflow**, choose a mode:
-- `verify`: checks the Gmail login and the site API. Sends nothing.
-- `dry-run`: audits the next clinics in the queue and shows who would be emailed. Sends nothing, changes nothing.
-- `send`: sends the batch.
-
-To make it **daily and automatic**, add the repository variable `OUTREACH_ENABLED` = `true`. It then runs Monday–Friday at 15:07 UTC (about 10am US Eastern). Delete the variable (or set it to `false`) to stop.
+To pause everything, set `OUTREACH_ENABLED` to `false` (or delete it). Manual runs still work.
 
 Same commands locally: `node outreach/gmail-outreach.mjs --verify | (no flag = dry run) | --send | --stats`,
-and `--test-to you@gmail.com --site https://a-dental-site.com` sends one sample email to yourself.
+`--test-to you@gmail.com --site https://a-dental-site.com` sends one sample email to yourself, and
+`npx tsx outreach/auto-leads.ts --state KS --dry-run` previews the lead finder (needs `osmium-tool` installed, or it uses the Overpass API).
 
 ### Replies and opt-outs
 
@@ -59,7 +56,7 @@ Anyone who asks not to be contacted, or whose email bounces:
 
 ## Ground rules (protect your Gmail account and reputation)
 
-- **Start slow.** A brand-new or rarely used Gmail account should start at 5–10/day for the first week. Use the `limit` input.
+- **Start slow.** A brand-new or rarely used Gmail account should start at 5–10/day for the first week (`OUTREACH_DAY_CAP`).
 - **Better deliverability:** a Google Workspace mailbox on your own domain (with SPF/DKIM) is far safer than a personal @gmail.com for cold email.
 - **CAN-SPAM (US):** keep the honest subject, your real name, physical address and the unsubscribe link. Honor opt-outs (automatic here).
 - **Outside the US:** Canada (CASL), the UK/EU (PECR/GDPR) and Australia have stricter consent rules for cold email. Start with US cities.

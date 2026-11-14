@@ -5,7 +5,7 @@
 // 1. Picks today's US state (rotates through STATES, one per day) unless --state is given.
 // 2. Loads OpenStreetMap data for that state: the Geofabrik state extract filtered with osmium-tool
 //    (the GitHub Action installs it), or the Overpass API when osmium isn't installed. Takes dentists with
-//    a website, plus every city of 50,000+ people. Drops practices within 15 km of those cities (so: smaller towns), chains,
+//    a website, plus every city of 50,000+ people. Drops practices in or near those cities (15-35 km, by size), chains,
 //    institutions, multi-location groups (same website 3+ times) and directory/social links.
 // 3. Drops domains already in the outreach queue/history or on the suppression list.
 // 4. For the rest, in random order: finds an email the practice publishes on its own site, runs the
@@ -28,7 +28,7 @@ import { args, domainOf, env, loadEnv, sleep } from "./lib.mjs";
 // @ts-ignore
 import { findEmail } from "./email-finder.mjs";
 // @ts-ignore
-import { prospectQuality } from "./email-template.mjs";
+import { prospectQuality, renderEmail } from "./email-template.mjs";
 
 loadEnv();
 const a = args() as Record<string, string | boolean>;
@@ -37,7 +37,8 @@ const TARGET = Math.max(1, Number(a.target || process.env.LEADS_DAILY_TARGET || 
 const MAX_SITES = Math.max(1, Number(a["max-sites"] || 90));
 const BACKLOG_MAX = Number(process.env.LEADS_BACKLOG_MAX || 40);
 const BIG_CITY_POP = 50_000;
-const BIG_CITY_RADIUS_KM = 15;
+/** Metro radius around a big city: bigger cities sprawl further. */
+const metroKm = (pop: number) => (pop >= 300_000 ? 35 : pop >= 100_000 ? 25 : 15);
 const SITE = String(env("SITE_URL", "https://enamelaudits.vercel.app")).replace(/\/$/, "");
 const UA = "EnamelAudits-lead-finder/1.0 (+https://enamelaudits.vercel.app/bot)";
 
@@ -182,6 +183,7 @@ const places = elements
   .filter((e) => e.tags?.place && e.type === "node" && e.lat != null && e.lon != null)
   .map((e) => ({ name: e.tags!.name || "", lat: e.lat!, lon: e.lon!, pop: Number(String(e.tags!.population || "").replace(/[^\d]/g, "")) || 0 }));
 const bigCities = places.filter((p) => p.pop >= BIG_CITY_POP);
+const bigCityNames = new Set(bigCities.map((c) => c.name.toLowerCase()));
 
 const dentists = elements
   .filter((e) => !e.tags?.place)
@@ -204,7 +206,8 @@ const candidates = dentists.filter((d) => {
   seen.add(d.domain);
   if ((perDomain.get(d.domain) || 0) >= 3) return false; // multi-location group
   if (CHAIN_OR_INSTITUTION.test(d.name) || BAD_DOMAIN.test(d.domain)) return false;
-  if (bigCities.some((c) => km(d.lat!, d.lon!, c.lat, c.lon) < BIG_CITY_RADIUS_KM)) return false;
+  if (d.city && bigCityNames.has(d.city.toLowerCase())) return false;
+  if (bigCities.some((c) => km(d.lat!, d.lon!, c.lat, c.lon) < metroKm(c.pop))) return false;
   if (!d.city) {
     const near = places.reduce<{ name: string; dist: number } | null>((best, p) => {
       const dist = km(d.lat!, d.lon!, p.lat, p.lon);
@@ -269,6 +272,11 @@ await Promise.all(
           queued++;
           pending.push({ ...base, status: "queued" });
           console.log(`✓ queue  ${c.domain} (${c.city || "?"}) ${result.score}/100 ${result.grade}, ${issues.length} issues · ${mask(email)}`);
+          if (DRY) {
+            // Preview of the email the hourly sender would write (it re-audits at send time).
+            const m = renderEmail({ lead: { name: c.name }, audit: { ...audit, domain: c.domain, reportUrl: "(report link)" }, sender: { name: "", address: "" } }) as { subject: string; text: string };
+            console.log(`         subject: ${m.subject}\n         opening: ${m.text.split("\n")[2].slice(0, 220)}`);
+          }
         } else {
           screened++;
           pending.push({ ...base, status: "skipped", reason: q.reason });
