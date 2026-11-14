@@ -93,6 +93,9 @@ function collectSchemaTypes($: cheerio.CheerioAPI): { types: Set<string>; hasAdd
 export async function runAudit(rawUrl: string): Promise<AuditResult> {
   const t0 = performance.now();
   const target = normalizeUrl(rawUrl);
+  // Browsers try HTTPS first, so audit the secure version even if an http:// address was given.
+  // If HTTPS doesn't work at all, the fallback below audits plain HTTP (and flags it).
+  if (target.protocol === "http:" && !target.port && process.env.ALLOW_PRIVATE_HOSTS !== "1") target.protocol = "https:";
 
   let page: FetchedPage;
   try {
@@ -167,7 +170,7 @@ export async function runAudit(rawUrl: string): Promise<AuditResult> {
   }
   internal.delete(page.finalUrl.split("#")[0]);
   const linkTargets = [...internal].slice(0, 25).concat([...external].slice(0, 10));
-  const linksP = pool(linkTargets, 8, async (u) => ({ url: u, internal: internal.has(u), ...(await probe(u, 6000)) }));
+  const linksP = pool(linkTargets, 4, async (u) => ({ url: u, internal: internal.has(u), ...(await probe(u, 6000)) }));
 
   // Images
   const imgs = $("img").toArray();
@@ -204,19 +207,22 @@ export async function runAudit(rawUrl: string): Promise<AuditResult> {
         : r("html_size", "fail", `Home page code is ${kb} KB, which is very heavy (aim for under 200 KB).`),
   );
 
-  const blocking = $("head script[src]")
+  const blockingAll = $("head script[src]")
     .toArray()
     .filter((el) => {
       const s = $(el);
       return s.attr("async") === undefined && s.attr("defer") === undefined && (s.attr("type") || "").toLowerCase() !== "module";
     })
     .map((el) => $(el).attr("src") || "");
+  const PLATFORM_SCRIPTS = /(assets\.squarespace\.com|static\.parastorage\.com|static\.wixstatic\.com|img1\.wsimg\.com|irp\.cdn-website\.com|cdn\.shopify\.com|website-files\.com|assets\.website-files\.com)/i;
+  const blocking = blockingAll.filter((src) => !PLATFORM_SCRIPTS.test(src));
+  const platformNote = blockingAll.length > blocking.length ? ` (${blockingAll.length - blocking.length} more are built into your website platform and can't be changed.)` : "";
   checks.push(
     blocking.length <= 2
-      ? r("render_blocking", "pass", blocking.length ? `${blocking.length} render-blocking script(s), which is acceptable.` : "No render-blocking scripts in the page head.")
+      ? r("render_blocking", "pass", (blocking.length ? `${blocking.length} render-blocking script(s), which is acceptable.` : "No render-blocking scripts you control in the page head.") + platformNote)
       : blocking.length <= 6
-        ? r("render_blocking", "warn", `${blocking.length} scripts in the page head block the page from appearing.`, blocking)
-        : r("render_blocking", "fail", `${blocking.length} scripts in the page head block the page from appearing.`, blocking),
+        ? r("render_blocking", "warn", `${blocking.length} scripts in the page head block the page from appearing.${platformNote}`, blocking)
+        : r("render_blocking", "fail", `${blocking.length} scripts in the page head block the page from appearing.${platformNote}`, blocking),
   );
 
   const requestCount =
@@ -467,9 +473,12 @@ export async function runAudit(rawUrl: string): Promise<AuditResult> {
   const bookingButton = $("button")
     .toArray()
     .find((b) => /\b(book|schedul|appointment)/i.test($(b).text()));
+  const bookingPhrase =
+    /\b(request|schedule|book|make)\s+(an?\s+|your\s+)?(appointment|appt|visit|consultation|exam)\b|\bbook\s+(online|now)\b|\bonline\s+(booking|scheduling)\b/i.exec(textAll);
   if (vendor) checks.push(r("online_booking", "pass", `Online booking found (${vendor.replace(/[./]+$/, "")}).`));
   else if (bookingText || bookingButton)
     checks.push(r("online_booking", "pass", `Appointment link found: "${$(bookingText || bookingButton!).text().trim().slice(0, 60)}".`));
+  else if (bookingPhrase) checks.push(r("online_booking", "pass", `Appointment option found: "${bookingPhrase[0]}".`));
   else checks.push(r("online_booking", "fail", "No booking button, scheduling link, or appointment-request form found on the home page."));
 
   const hasForm = $("form").toArray().some((f) => $(f).find('input[type="email"], textarea, input[type="tel"]').length > 0);
@@ -542,16 +551,24 @@ export async function runAudit(rawUrl: string): Promise<AuditResult> {
 
   // ---------------- LINKS
   const [links, images] = await Promise.all([linksP, imagesP]);
-  const broken = links.filter((l) => {
-    if (l.internal) return l.status >= 400 || l.status === 0;
-    return l.status === 404 || l.status === 410 || (l.status >= 500 && l.status < 600);
-  });
+  // Only definitive errors count. Timeouts / "no response" and 403/429 usually mean the server
+  // throttled or blocked our checker, not that the page is missing, so they're never reported as broken.
+  const definitive = (status: number) => status === 404 || status === 410 || (status >= 500 && status < 600);
+  const suspects = links.filter((l) => definitive(l.status));
+  const broken: typeof links = [];
+  for (const l of suspects.slice(0, 12)) {
+    await new Promise((res) => setTimeout(res, 500));
+    const again = await probe(l.url, 8000);
+    if (definitive(again.status)) broken.push({ ...l, status: again.status });
+  }
+  const unverified = links.filter((l) => l.status === 0 || l.status === 403 || l.status === 429).length;
   const brokenInternal = broken.filter((l) => l.internal);
-  const ev = broken.map((l) => `${l.status || "no response"}: ${l.url}`);
+  const ev = broken.map((l) => `${l.status}: ${l.url}`);
+  const unverifiedNote = unverified ? ` (${unverified} couldn't be checked: the server didn't respond or blocked our check.)` : "";
   if (!links.length) checks.push(r("broken_links", "pass", "No links to check."));
-  else if (brokenInternal.length) checks.push(r("broken_links", "fail", `${broken.length} of ${links.length} links checked are broken.`, ev));
-  else if (broken.length) checks.push(r("broken_links", "warn", `${broken.length} external link(s) are broken.`, ev, "low"));
-  else checks.push(r("broken_links", "pass", `All ${links.length} links checked work.`));
+  else if (brokenInternal.length) checks.push(r("broken_links", "fail", `${broken.length} of ${links.length} links checked are broken.${unverifiedNote}`, ev));
+  else if (broken.length) checks.push(r("broken_links", "warn", `${broken.length} external link(s) are broken.${unverifiedNote}`, ev, "low"));
+  else checks.push(r("broken_links", "pass", `No broken links among ${links.length - unverified} checked.${unverifiedNote}`));
 
   const heavy = images.filter((i) => i.bytes > 400_000).sort((a, b) => b.bytes - a.bytes);
   const measured = images.filter((i) => i.bytes > 0);
