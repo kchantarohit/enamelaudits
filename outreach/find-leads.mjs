@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Build a lead list of dental practices with websites, using the official Google Places API.
 //
-//   node outreach/find-leads.mjs --city "Austin, TX" [--query "dentist"] [--max 60] [--emails]
+//   node outreach/find-leads.mjs --city "Austin, TX" [--query "dentist"] [--max 60] [--emails] [--enqueue]
 //
 // Output: outreach/out/leads-<city>.csv with name, website, phone, address, rating, reviews,
 // and (with --emails) a publicly listed contact email found on the practice's own website.
+// With --enqueue, practices that have an email are added straight to the Gmail outreach queue.
 // Requires GOOGLE_PLACES_API_KEY (Places API (New) enabled; first $200/month of usage is free).
 import path from "node:path";
 import fs from "node:fs";
@@ -102,4 +103,17 @@ if (a.emails) {
 const file = path.join(OUT, `leads-${a.city.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`);
 fs.writeFileSync(file, toCsv(unique, ["name", "first_name", "email", "website", "domain", "phone", "address", "city", "rating", "reviews", "place_id"]));
 console.log(`\n${unique.length} practices with websites -> ${file}`);
-console.log("Review the list, add first names where you know them, remove anyone you shouldn't contact, then run cold-email.mjs.");
+if (a.enqueue) {
+  const rows = unique.filter((l) => l.email).map((l) => ({ email: l.email, website: l.website, domain: l.domain, name: l.name, city: l.city, source: `places:${a.city}` }));
+  const base = env("SITE_URL", "https://enamelaudits.vercel.app").replace(/\/$/, "");
+  const res = await fetch(`${base}/api/outreach/contacts`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${env("OUTREACH_TOKEN")}` },
+    body: JSON.stringify({ action: "enqueue", rows }),
+  });
+  const r = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(r.error || `enqueue failed (${res.status})`);
+  console.log(`Queued ${r.inserted} clinic(s) for Gmail outreach; skipped ${r.skipped} (duplicates, suppressed or invalid).`);
+} else {
+  console.log("Review the list, remove anyone you shouldn't contact, then: node outreach/gmail-outreach.mjs --enqueue " + path.relative(process.cwd(), file));
+}

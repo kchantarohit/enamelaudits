@@ -116,3 +116,36 @@ export const stats = (days: number) => rpc<Record<string, unknown>>("ea_stats", 
 export function isUuid(s: string | null | undefined): s is string {
   return !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 }
+
+// ---- Cold outreach queue (migration 0003) ------------------------------------
+export interface OutreachContact {
+  id: string;
+  email: string;
+  domain: string;
+  website: string;
+  name: string | null;
+  first_name: string | null;
+  city: string | null;
+  status: string;
+  attempts: number;
+}
+
+export interface OutreachLead {
+  email: string;
+  domain: string;
+  website?: string;
+  name?: string;
+  first_name?: string;
+  city?: string;
+  source?: string;
+}
+
+export const outreachEnqueue = (rows: OutreachLead[]) =>
+  rpc<{ inserted: number; skipped: number }>("ea_outreach_enqueue", { p_rows: rows });
+export const outreachPeek = (limit: number) => rpc<OutreachContact[]>("ea_outreach_peek", { p_limit: limit });
+export const outreachNext = (limit: number, dailyCap: number) =>
+  rpc<{ contacts: OutreachContact[]; sent_24h: number; remaining_24h: number }>("ea_outreach_next", { p_limit: limit, p_daily_cap: dailyCap });
+export const outreachResult = (id: string, status: "sent" | "skipped" | "failed", data: Record<string, unknown>) =>
+  rpc<null>("ea_outreach_result", { p_id: id, p_status: status, p_data: data });
+export const outreachSuppress = (value: string, reason: string) => rpc<null>("ea_outreach_suppress", { p_value: value, p_reason: reason });
+export const outreachStats = () => rpc<Record<string, unknown>>("ea_outreach_stats", {});
