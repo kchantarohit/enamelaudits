@@ -2,6 +2,16 @@
 
 Every action taken against the store, newest first. Reads are listed so each finding can be traced.
 
+## 2026-11-14 — publish refund / shipping / terms: blocked by permissions
+Owner said "use the defaults". **Writes to the store: none.** Shopify refused all three updates.
+
+- Filled the drafts with the suggested defaults. Blanks that had no default were filled with neutral wording that's true either way: a link to `/pages/contact` instead of email or LINE, "tracked courier services" instead of a named courier, tracking sent by email, no VAT wording, operator not named. Checked that no `[[...]]` was left.
+- Moved the finished Markdown to `policies/` and built HTML bodies in `policies/html/` with `tools/md2policy.py`.
+- Before writing: checked the store's policies. Only PRIVACY_POLICY exists, so nothing would have been overwritten.
+- `shopPolicyUpdate` ×3 (REFUND_POLICY, SHIPPING_POLICY, TERMS_OF_SERVICE): **Access denied**. The connector lacks the `write_legal_policies` scope. Read back afterwards: still only PRIVACY_POLICY, unchanged.
+- Workaround: pages to copy from in `policies/copy-paste/`, for the owner to paste in Shopify admin → Settings → Policies.
+- Contact information is still a draft (`policies/drafts/contact-information.md`); every line in it needs the owner's business details.
+
 ## 2026-11-14 — bilingual policy drafts (not published)
 **Writes to the store: none.** Drafts in `policies/drafts/` (refund, shipping, terms of service, contact info), Thai + English. They have `[[...]]` blanks that the owner needs to fill in. Publish only after approval, with `shopPolicyUpdate`.
 

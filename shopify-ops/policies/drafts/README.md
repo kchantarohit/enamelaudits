@@ -1,5 +1,7 @@
 # Policy drafts: review checklist
 
+> **Update 2026-11-14:** refund, shipping and terms were finished with the defaults and moved to `../` (paste-ready copies in `../copy-paste/`). The connector can't publish policies (missing `write_legal_policies`), so they're pasted in Shopify admin. Only `contact-information.md` is still a draft here.
+
 Four new policies, each bilingual (Thai first, English below on the same page). **Not published yet.** Once you approve, I'll check that no `[[...]]` is left, convert each one to HTML and publish it with `shopPolicyUpdate`.
 
 | File | Shopify policy |

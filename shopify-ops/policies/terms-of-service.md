@@ -1,19 +1,17 @@
 # ข้อกำหนดการใช้บริการ / Terms of service
 
-<!-- Shopify policy type: TERMS_OF_SERVICE. Fill in every [[...]] before publishing. -->
-
 ## ภาษาไทย
 
-อัปเดตล่าสุด: [[วันที่เผยแพร่]]
+อัปเดตล่าสุด: 14 พฤศจิกายน 2569
 
 ### 1. ภาพรวม
-เว็บไซต์นี้ดำเนินการโดย [[ชื่อร้าน / ชื่อผู้ประกอบการหรือนิติบุคคล]] ("ร้าน" หรือ "เรา") การใช้เว็บไซต์หรือสั่งซื้อสินค้าถือว่าคุณยอมรับข้อกำหนดเหล่านี้ รวมถึงนโยบายการจัดส่ง นโยบายการคืนสินค้าและคืนเงิน และนโยบายความเป็นส่วนตัวของเรา
+ข้อกำหนดเหล่านี้ใช้กับเว็บไซต์และร้านค้าออนไลน์นี้ ("ร้าน" หรือ "เรา") การใช้เว็บไซต์หรือสั่งซื้อสินค้าถือว่าคุณยอมรับข้อกำหนดเหล่านี้ รวมถึงนโยบายการจัดส่ง นโยบายการคืนสินค้าและคืนเงิน และนโยบายความเป็นส่วนตัวของเรา
 
 ### 2. ผู้สั่งซื้อ
 คุณต้องบรรลุนิติภาวะ หรือได้รับความยินยอมจากผู้ปกครองหรือผู้แทนโดยชอบธรรมก่อนสั่งซื้อสินค้า
 
 ### 3. สินค้าและราคา
-- ราคาแสดงเป็นเงินบาท [[รวมภาษีมูลค่าเพิ่มแล้ว]] โดยยังไม่รวมค่าจัดส่ง ซึ่งจะแสดงที่หน้าชำระเงิน
+- ราคาแสดงเป็นเงินบาท โดยยังไม่รวมค่าจัดส่ง ซึ่งจะแสดงที่หน้าชำระเงิน
 - เราพยายามแสดงรายละเอียดและรูปภาพสินค้าให้ถูกต้องที่สุด แต่สีที่เห็นอาจแตกต่างเล็กน้อยตามหน้าจอของคุณ
 - เราอาจเปลี่ยนแปลงราคาหรือหยุดจำหน่ายสินค้าได้ทุกเมื่อ โดยไม่กระทบคำสั่งซื้อที่ยืนยันแล้ว
 
@@ -45,22 +43,22 @@
 ข้อกำหนดนี้จัดทำเป็นภาษาไทยและภาษาอังกฤษ หากข้อความทั้งสองภาษาขัดแย้งกัน ให้ถือฉบับภาษาไทยเป็นหลัก
 
 ### 13. ติดต่อเรา
-ดูช่องทางติดต่อได้ที่หน้าข้อมูลติดต่อของเรา
+ติดต่อเราได้ที่[หน้าติดต่อ](/pages/contact)
 
 ---
 
 ## English
 
-Last updated: [[publish date]]
+Last updated: 14 November 2026
 
 ### 1. Overview
-This website is run by [[store name / registered business name]] ("the store", "we"). By using this website or placing an order, you agree to these terms and to our shipping policy, refund policy and privacy policy.
+These terms apply to this website and online store ("the store", "we"). By using this website or placing an order, you agree to these terms and to our shipping policy, refund policy and privacy policy.
 
 ### 2. Who can order
 You must be of legal age, or have consent from a parent or legal guardian, to place an order.
 
 ### 3. Products and prices
-- Prices are in Thai baht, [[including VAT,]] and don't include shipping, which is shown at checkout.
+- Prices are in Thai baht and don't include shipping, which is shown at checkout.
 - We try to show products and photos as accurately as we can, but colours may look slightly different on your screen.
 - We may change prices or stop selling a product at any time. This doesn't affect orders we've already confirmed.
 
@@ -92,4 +90,4 @@ These terms are governed by the laws of the Kingdom of Thailand.
 These terms are written in Thai and English. If the two versions conflict, the Thai version applies.
 
 ### 13. Contact us
-See our contact information page for ways to reach us.
+Reach us through our [contact page](/pages/contact).

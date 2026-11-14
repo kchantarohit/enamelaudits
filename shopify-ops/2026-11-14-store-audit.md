@@ -39,7 +39,7 @@ Mode: **read-only**. No store data was changed.
 
 ### Should do before launch
 6. **Fill in the store and location address.** Shipping origin, tax invoices and the contact policy use it.
-7. **Add the missing policies:** refund, shipping, terms of service, contact info. Payment providers and ad channels often check for these. *I can draft them (Thai, English or both) for you to approve.*
+7. ⏳ **Partly done:** refund, shipping and terms are written and ready to paste (`policies/copy-paste/`). The connector can't publish policies. Contact info still needs business details. **Add the missing policies:** refund, shipping, terms of service, contact info. Payment providers and ad channels often check for these. *I can draft them (Thai, English or both) for you to approve.*
 8. **Set up collections** once there are products, and put real products in the homepage collection.
 9. **Add footer links** to the policies and Contact. Right now the footer only has Search.
 10. **Add About and FAQ pages** covering delivery times, couriers, returns, and whether you accept COD or PromptPay.
