@@ -1,8 +1,9 @@
 // Daily automated lead finder: small-town US dental practices -> audited -> outreach queue. No API key needed.
 //
-//   npx tsx outreach/auto-leads.ts [--state KS] [--target 12] [--max-sites 90] [--dry-run]
+//   npx tsx outreach/auto-leads.ts [--state KS] [--target 12] [--max-sites 150] [--max-states 4] [--dry-run]
 //
-// 1. Picks today's US state (rotates through STATES, one per day) unless --state is given.
+// 1. Starts with today's US state (rotates through STATES, one per day) unless --state is given, and moves
+//    on to the next states in the rotation (up to --max-states) until the daily target is reached.
 // 2. Loads OpenStreetMap data for that state: the Geofabrik state extract filtered with osmium-tool
 //    (the GitHub Action installs it), or the Overpass API when osmium isn't installed. Takes dentists with
 //    a website, plus every city of 50,000+ people. Drops practices in or near those cities (15-35 km, by size), chains,
@@ -34,7 +35,8 @@ loadEnv();
 const a = args() as Record<string, string | boolean>;
 const DRY = !!a["dry-run"];
 const TARGET = Math.max(1, Number(a.target || process.env.LEADS_DAILY_TARGET || 12));
-const MAX_SITES = Math.max(1, Number(a["max-sites"] || 90));
+const MAX_SITES = Math.max(1, Number(a["max-sites"] || 150));
+const MAX_STATES = Math.max(1, Number(a["max-states"] || 4));
 const BACKLOG_MAX = Number(process.env.LEADS_BACKLOG_MAX || 40);
 const BIG_CITY_POP = 50_000;
 /** Metro radius around a big city: bigger cities sprawl further. */
@@ -48,11 +50,12 @@ const STATES = [
   "OH", "NC", "IL", "VA", "MI", "WV", "PA", "NY", "ME", "VT", "NH", "TX", "NM", "CO", "WY", "MT", "ID", "UT",
   "OR", "WA", "NV", "AZ", "CA", "FL", "MD", "DE", "NJ", "CT", "MA", "RI", "AK", "HI",
 ];
-const STATE = String(a.state || STATES[Math.floor(Date.now() / 86_400_000) % STATES.length]).toUpperCase();
-if (!STATES.includes(STATE)) {
-  console.error(`Unknown state "${STATE}". Use a two-letter code: ${STATES.join(" ")}`);
+const FIRST = String(a.state || STATES[Math.floor(Date.now() / 86_400_000) % STATES.length]).toUpperCase();
+if (!STATES.includes(FIRST)) {
+  console.error(`Unknown state "${FIRST}". Use a two-letter code: ${STATES.join(" ")}`);
   process.exit(1);
 }
+const RUN_STATES = a.state ? [FIRST] : Array.from({ length: MAX_STATES }, (_, k) => STATES[(STATES.indexOf(FIRST) + k) % STATES.length]);
 
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
 const GEOFABRIK: Record<string, string> = {
@@ -108,7 +111,7 @@ const hasOsmium = () => {
 };
 
 /** Download the state's OpenStreetMap extract from Geofabrik and keep dentists + populated places. */
-async function geofabrik(): Promise<El[]> {
+async function geofabrik(STATE: string): Promise<El[]> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "osm-"));
   const pbf = path.join(dir, "state.osm.pbf");
   const url = `https://download.geofabrik.de/north-america/us/${GEOFABRIK[STATE]}-latest.osm.pbf`;
@@ -136,10 +139,10 @@ async function geofabrik(): Promise<El[]> {
   return els;
 }
 
-async function loadOsm(): Promise<El[]> {
+async function loadOsm(STATE: string): Promise<El[]> {
   if (hasOsmium()) {
     try {
-      return await geofabrik();
+      return await geofabrik(STATE);
     } catch (e) {
       console.log(`Geofabrik/osmium failed (${(e as Error).message}); falling back to the Overpass API.`);
     }
@@ -164,9 +167,9 @@ async function api(action: string, body: Record<string, unknown> = {}) {
   return data;
 }
 
-// ---------------------------------------------------------------- 1. candidates from OpenStreetMap
+// ---------------------------------------------------------------- run
 const t0 = Date.now();
-console.log(`Lead finder · state ${STATE} · target ${TARGET} queued · max ${MAX_SITES} sites${DRY ? " · DRY RUN" : ""}`);
+console.log(`Lead finder · states ${RUN_STATES.join(", ")} · target ${TARGET} queued · max ${MAX_SITES} sites${DRY ? " · DRY RUN" : ""}`);
 
 if (!DRY) {
   const stats = await api("stats");
@@ -177,71 +180,12 @@ if (!DRY) {
   }
 }
 
-const elements = await loadOsm();
-
-const places = elements
-  .filter((e) => e.tags?.place && e.type === "node" && e.lat != null && e.lon != null)
-  .map((e) => ({ name: e.tags!.name || "", lat: e.lat!, lon: e.lon!, pop: Number(String(e.tags!.population || "").replace(/[^\d]/g, "")) || 0 }));
-const bigCities = places.filter((p) => p.pop >= BIG_CITY_POP);
-const bigCityNames = new Set(bigCities.map((c) => c.name.toLowerCase()));
-
-const dentists = elements
-  .filter((e) => !e.tags?.place)
-  .map((e) => {
-    const t = e.tags || {};
-    const lat = e.lat ?? e.center?.lat;
-    const lon = e.lon ?? e.center?.lon;
-    let website = (t.website || t["contact:website"] || t.url || "").split(";")[0].trim();
-    if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
-    return { name: t.name || "", website, domain: domainOf(website), lat, lon, city: t["addr:city"] || "" };
-  })
-  .filter((d) => d.domain && d.lat != null && d.lon != null);
-
-const perDomain = new Map<string, number>();
-for (const d of dentists) perDomain.set(d.domain, (perDomain.get(d.domain) || 0) + 1);
-
-const seen = new Set<string>();
-const candidates = dentists.filter((d) => {
-  if (seen.has(d.domain)) return false;
-  seen.add(d.domain);
-  if ((perDomain.get(d.domain) || 0) >= 3) return false; // multi-location group
-  if (CHAIN_OR_INSTITUTION.test(d.name) || BAD_DOMAIN.test(d.domain)) return false;
-  if (d.city && bigCityNames.has(d.city.toLowerCase())) return false;
-  if (bigCities.some((c) => km(d.lat!, d.lon!, c.lat, c.lon) < metroKm(c.pop))) return false;
-  if (!d.city) {
-    const near = places.reduce<{ name: string; dist: number } | null>((best, p) => {
-      const dist = km(d.lat!, d.lon!, p.lat, p.lon);
-      return !best || dist < best.dist ? { name: p.name, dist } : best;
-    }, null);
-    if (near && near.dist < 20) d.city = near.name;
-  }
-  return true;
-});
-console.log(`OpenStreetMap: ${dentists.length} dentists with websites, ${bigCities.length} cities of ${BIG_CITY_POP.toLocaleString()}+; ${candidates.length} small-town independents.`);
-
-// ---------------------------------------------------------------- 2. skip anyone we already know
-let fresh = candidates;
-if (!DRY) {
-  const known = new Set<string>();
-  for (let i = 0; i < candidates.length; i += 500) {
-    const r = await api("known", { domains: candidates.slice(i, i + 500).map((c) => c.domain) });
-    for (const d of r.known || []) known.add(d);
-  }
-  fresh = candidates.filter((c) => !known.has(c.domain));
-  console.log(`${candidates.length - fresh.length} already contacted, screened or suppressed; ${fresh.length} new.`);
-}
-for (let i = fresh.length - 1; i > 0; i--) {
-  const j = Math.floor(Math.random() * (i + 1));
-  [fresh[i], fresh[j]] = [fresh[j], fresh[i]];
-}
-
-// ---------------------------------------------------------------- 3. email -> audit -> queue
 let checked = 0;
 let noEmail = 0;
 let queued = 0;
 let screened = 0;
 let failed = 0;
-let next = 0;
+let loaded = 0;
 const pending: Record<string, unknown>[] = [];
 
 async function flush() {
@@ -251,45 +195,119 @@ async function flush() {
   if (r.skipped) console.log(`  (${r.skipped} row(s) were already known or suppressed)`);
 }
 
-await Promise.all(
-  Array.from({ length: 4 }, async () => {
-    while (next < fresh.length && checked < MAX_SITES && queued < TARGET) {
-      const c = fresh[next++];
-      checked++;
-      const email: string = await findEmail(c.website);
-      if (!email) {
-        noEmail++;
-        continue;
-      }
-      try {
-        const result = await runAudit(c.website);
-        const issues = rankIssues(result.checks).map((x) => ({ id: x.id, status: x.status, severity: severityOf(x), issue: CHECK_BY_ID[x.id].issue, detail: x.detail }));
-        const audit = { score: result.score, grade: result.grade, issueCount: issues.length, issues };
-        const q = prospectQuality(audit) as { ok: boolean; reason?: string };
-        const base = { email, domain: domainOf(result.meta.finalUrl || c.website) || c.domain, website: c.website, name: c.name, city: c.city ? `${c.city}, ${STATE}` : STATE, source: `osm:${STATE}`, score: result.score, grade: result.grade, issue_count: issues.length };
-        if (q.ok) {
-          if (queued >= TARGET) continue; // another worker filled today's target; leave this one for a later run
-          queued++;
-          pending.push({ ...base, status: "queued" });
-          console.log(`✓ queue  ${c.domain} (${c.city || "?"}) ${result.score}/100 ${result.grade}, ${issues.length} issues · ${mask(email)}`);
-          if (DRY) {
-            // Preview of the email the hourly sender would write (it re-audits at send time).
-            const m = renderEmail({ lead: { name: c.name }, audit: { ...audit, domain: c.domain, reportUrl: "(report link)" }, sender: { name: "", address: "" } }) as { subject: string; text: string };
-            console.log(`         subject: ${m.subject}\n         opening: ${m.text.split("\n")[2].slice(0, 220)}`);
-          }
-        } else {
-          screened++;
-          pending.push({ ...base, status: "skipped", reason: q.reason });
-          console.log(`- skip   ${c.domain} ${result.score}/100: ${q.reason}`);
-        }
-        if (pending.length >= 10) await flush();
-      } catch (e) {
-        failed++;
-        console.log(`- error  ${c.domain}: ${(e as Error).message.slice(0, 120)}`);
-      }
+async function processState(STATE: string) {
+  // 1. candidates from OpenStreetMap
+  const elements = await loadOsm(STATE);
+  loaded++;
+  const places = elements
+    .filter((e) => e.tags?.place && e.type === "node" && e.lat != null && e.lon != null)
+    .map((e) => ({ name: e.tags!.name || "", lat: e.lat!, lon: e.lon!, pop: Number(String(e.tags!.population || "").replace(/[^\d]/g, "")) || 0 }));
+  const bigCities = places.filter((p) => p.pop >= BIG_CITY_POP);
+  const bigCityNames = new Set(bigCities.map((c) => c.name.toLowerCase()));
+
+  const dentists = elements
+    .filter((e) => !e.tags?.place)
+    .map((e) => {
+      const t = e.tags || {};
+      const lat = e.lat ?? e.center?.lat;
+      const lon = e.lon ?? e.center?.lon;
+      let website = (t.website || t["contact:website"] || t.url || "").split(";")[0].trim();
+      if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
+      return { name: t.name || "", website, domain: domainOf(website), lat, lon, city: t["addr:city"] || "" };
+    })
+    .filter((d) => d.domain && d.lat != null && d.lon != null);
+
+  const perDomain = new Map<string, number>();
+  for (const d of dentists) perDomain.set(d.domain, (perDomain.get(d.domain) || 0) + 1);
+
+  const seen = new Set<string>();
+  const candidates = dentists.filter((d) => {
+    if (seen.has(d.domain)) return false;
+    seen.add(d.domain);
+    if ((perDomain.get(d.domain) || 0) >= 3) return false; // multi-location group
+    if (CHAIN_OR_INSTITUTION.test(d.name) || BAD_DOMAIN.test(d.domain)) return false;
+    if (d.city && bigCityNames.has(d.city.toLowerCase())) return false;
+    if (bigCities.some((c) => km(d.lat!, d.lon!, c.lat, c.lon) < metroKm(c.pop))) return false;
+    if (!d.city) {
+      const near = places.reduce<{ name: string; dist: number } | null>((best, p) => {
+        const dist = km(d.lat!, d.lon!, p.lat, p.lon);
+        return !best || dist < best.dist ? { name: p.name, dist } : best;
+      }, null);
+      if (near && near.dist < 20) d.city = near.name;
     }
-  }),
-);
+    return true;
+  });
+  console.log(`[${STATE}] OpenStreetMap: ${dentists.length} dentists with websites, ${bigCities.length} cities of ${BIG_CITY_POP.toLocaleString()}+; ${candidates.length} small-town independents.`);
+
+  // 2. skip anyone we already know
+  let fresh = candidates;
+  if (!DRY) {
+    const known = new Set<string>();
+    for (let i = 0; i < candidates.length; i += 500) {
+      const r = await api("known", { domains: candidates.slice(i, i + 500).map((c) => c.domain) });
+      for (const d of r.known || []) known.add(d);
+    }
+    fresh = candidates.filter((c) => !known.has(c.domain));
+    console.log(`[${STATE}] ${candidates.length - fresh.length} already contacted, screened or suppressed; ${fresh.length} new.`);
+  }
+  for (let i = fresh.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [fresh[i], fresh[j]] = [fresh[j], fresh[i]];
+  }
+
+  // 3. email -> audit -> queue
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: 4 }, async () => {
+      while (next < fresh.length && checked < MAX_SITES && queued < TARGET) {
+        const c = fresh[next++];
+        checked++;
+        const email: string = await findEmail(c.website);
+        if (!email) {
+          noEmail++;
+          continue;
+        }
+        try {
+          const result = await runAudit(c.website);
+          const issues = rankIssues(result.checks).map((x) => ({ id: x.id, status: x.status, severity: severityOf(x), issue: CHECK_BY_ID[x.id].issue, detail: x.detail }));
+          const audit = { score: result.score, grade: result.grade, issueCount: issues.length, issues };
+          const q = prospectQuality(audit) as { ok: boolean; reason?: string };
+          const base = { email, domain: domainOf(result.meta.finalUrl || c.website) || c.domain, website: c.website, name: c.name, city: c.city ? `${c.city}, ${STATE}` : STATE, source: `osm:${STATE}`, score: result.score, grade: result.grade, issue_count: issues.length };
+          if (q.ok) {
+            if (queued >= TARGET) continue; // another worker filled today's target; leave this one for a later run
+            queued++;
+            pending.push({ ...base, status: "queued" });
+            console.log(`✓ queue  ${c.domain} (${c.city || "?"}, ${STATE}) ${result.score}/100 ${result.grade}, ${issues.length} issues · ${mask(email)}`);
+            if (DRY) {
+              // Preview of the email the hourly sender would write (it re-audits at send time).
+              const m = renderEmail({ lead: { name: c.name }, audit: { ...audit, domain: c.domain, reportUrl: "(report link)" }, sender: { name: "", address: "" } }) as { subject: string; text: string };
+              console.log(`         subject: ${m.subject}\n         opening: ${m.text.split("\n")[2].slice(0, 220)}`);
+            }
+          } else {
+            screened++;
+            pending.push({ ...base, status: "skipped", reason: q.reason });
+            console.log(`- skip   ${c.domain} ${result.score}/100: ${q.reason}`);
+          }
+          if (pending.length >= 10) await flush();
+        } catch (e) {
+          failed++;
+          console.log(`- error  ${c.domain}: ${(e as Error).message.slice(0, 120)}`);
+        }
+      }
+    }),
+  );
+  await flush();
+}
+
+for (const st of RUN_STATES) {
+  if (queued >= TARGET || checked >= MAX_SITES) break;
+  try {
+    await processState(st);
+  } catch (e) {
+    console.log(`[${st}] skipped: ${(e as Error).message}`);
+  }
+}
 await flush();
 
-console.log(`\nDone in ${Math.round((Date.now() - t0) / 1000)} s · state ${STATE}: checked ${checked} sites · ${noEmail} without a public email · ${queued} queued · ${screened} screened out · ${failed} errors${DRY ? " (dry run: nothing saved)" : ""}.`);
+console.log(`\nDone in ${Math.round((Date.now() - t0) / 1000)} s · checked ${checked} sites · ${noEmail} without a public email · ${queued} queued · ${screened} screened out · ${failed} errors${DRY ? " (dry run: nothing saved)" : ""}.`);
+if (!loaded) process.exitCode = 1; // no map data could be loaded at all: make the Action fail visibly
