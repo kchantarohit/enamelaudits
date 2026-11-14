@@ -3,6 +3,8 @@ import { AuditForm } from "@/components/AuditForm";
 import { CategoryBars, ScoreDial } from "@/components/ScoreDial";
 import { CHECKS } from "@/lib/audit/catalog";
 import { CATEGORY_META, CATEGORY_ORDER, SITE } from "@/lib/site";
+import { PROBLEMS } from "@/content/problems";
+import { PLATFORMS } from "@/content/platforms";
 
 const FAQ = [
   {
@@ -227,6 +229,25 @@ export default function Home() {
                 <p className="mt-2 text-muted">{f.a}</p>
               </details>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 pt-16">
+        <h2 className="text-3xl font-extrabold">Popular questions</h2>
+        <div className="mt-6 grid gap-8 md:grid-cols-2">
+          <ul className="space-y-2">
+            {PROBLEMS.map((p) => (
+              <li key={p.slug}><Link className="font-semibold text-brand-dark hover:underline" href={`/problems/${p.slug}`}>{p.title}</Link></li>
+            ))}
+          </ul>
+          <div>
+            <p className="font-bold">Fixes for your platform</p>
+            <ul className="mt-2 space-y-2">
+              {PLATFORMS.map((p) => (
+                <li key={p.slug}><Link className="text-brand-dark hover:underline" href={`/platforms/${p.slug}`}>{p.headline}</Link></li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>

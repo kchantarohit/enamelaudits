@@ -13,7 +13,7 @@ export function Footer() {
         <div>
           <p className="font-bold text-white">For practices</p>
           <ul className="mt-2 space-y-1 text-sm">
-            {SPECIALTIES.slice(0, 6).map((s) => (
+            {SPECIALTIES.slice(0, 8).map((s) => (
               <li key={s.slug}><Link className="hover:text-white" href={`/for/${s.slug}`}>{s.plural}</Link></li>
             ))}
           </ul>
@@ -24,6 +24,8 @@ export function Footer() {
             <li><Link className="hover:text-white" href="/#audit">Free website check</Link></li>
             <li><Link className="hover:text-white" href="/tools/dentist-schema-generator">Dentist schema generator</Link></li>
             <li><Link className="hover:text-white" href="/guides">Dental website guides</Link></li>
+            <li><Link className="hover:text-white" href="/problems">Common website problems</Link></li>
+            <li><Link className="hover:text-white" href="/platforms">Fixes by platform</Link></li>
           </ul>
         </div>
         <div>

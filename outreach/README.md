@@ -4,11 +4,10 @@ Everything here pushes traffic to **https://enamelaudits.vercel.app** with a `?r
 
 | Channel | Script / asset | Automated? |
 | --- | --- | --- |
-| Cold email (highest intent) | `find-leads.mjs` → `cold-email.mjs` | Drafts automatically; you review, then `--send` |
-| X / Twitter | `x-post.mjs` + `content/x-posts.json` (24 tips) | Yes: daily via `.github/workflows/social.yml` |
-| Reddit | `reddit-finder.mjs` | Finds threads + drafts replies weekly; **you post by hand**. Needs Reddit API keys on servers/CI (Reddit blocks anonymous cloud requests). |
-| Launch posts | `content/launch-posts.md` | Copy/paste (SideProject, Indie Hackers, LinkedIn, FB groups) |
-| SEO (passive) | 44 `/guides/*`, 8 `/for/*`, schema generator, sitemap | Live; submit sitemap in Google Search Console |
+| Cold email (highest intent) | `find-leads.mjs` → `cold-email.mjs`, manual templates in `templates/cold-email.md` | Drafts automatically; you review, then `--send` |
+| Reddit & Facebook | `content/reddit-facebook-posts.md` + `reddit-finder.mjs` | Ready-to-copy posts and reply templates; the finder lists threads to answer (run it on your own computer). **You post by hand.** |
+| Launch posts | `content/launch-posts.md` | Copy/paste (SideProject, Indie Hackers, LinkedIn) |
+| SEO (passive) | 44 `/guides/*`, 10 `/problems/*`, 6 `/platforms/*`, 12 `/for/*`, schema generator, sitemap | Live; submit sitemap in Google Search Console |
 
 ## Setup (10 minutes)
 
@@ -41,13 +40,13 @@ Practices scoring 90+ or with fewer than 3 issues are skipped automatically. Don
 - **Outside the US:** Canada (CASL), the UK/EU (PECR/GDPR) and Australia have stricter consent rules for cold email. Start with US cities.
 - **Deliverability:** send from a separate domain or mailbox (e.g. `hello@getenamelaudits.com`) with SPF/DKIM set up, warm it up (10/day the first week), and keep volume modest.
 - **Reddit:** never automate comments. Answer the question; include a link only where the subreddit allows it.
-- **No fake proof.** No invented testimonials or stats. `x-post.mjs --stats` only posts real aggregate numbers once there are 25+ audits.
+- **No fake proof.** No invented testimonials or stats. Only quote numbers from your own data (see the SQL below).
 
-## X autopilot
+## Fastest path to the first sale (today)
 
-Add repo secrets `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` (GitHub → Settings → Secrets → Actions).
-The workflow posts one tip per day (rotating through `content/x-posts.json`) and builds a Monday Reddit digest (downloadable artifact).
-Edit tips in `content/build-x-posts.mjs`, then run `node outreach/content/build-x-posts.mjs` (it enforces the 280-character limit).
+1. Post the **"drop your website, I'll review it"** thread from `content/reddit-facebook-posts.md` in 1–2 Facebook groups for dental office managers/owners.
+2. Run 10–20 practices through the free check and send template 1 or 2 from `templates/cold-email.md` (or use `cold-email.mjs`).
+3. Answer replies with the scripts in section 6 of the templates. Most sales come from the reply, not the first email.
 
 ## Measure
 

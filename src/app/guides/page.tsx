@@ -17,6 +17,10 @@ export default function GuidesIndex() {
         Every problem our audit checks for, explained in plain English with how to check it yourself and how to fix it. Or{" "}
         <Link href="/#audit" className="underline">run a free check</Link> to see which ones affect your site.
       </p>
+      <p className="mt-3 text-muted">
+        Prefer to start from a symptom? See <Link className="underline" href="/problems">common dental website problems</Link>, or get{" "}
+        <Link className="underline" href="/platforms">platform-specific fixes</Link> for WordPress, Wix, Squarespace and more.
+      </p>
       {CATEGORY_ORDER.map((cat) => (
         <section key={cat} className="mt-10">
           <h2 className="text-2xl font-extrabold">{CATEGORY_META[cat].label}</h2>
