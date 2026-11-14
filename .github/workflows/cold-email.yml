@@ -1,22 +1,25 @@
-name: Daily cold email
+name: Hourly cold email
 
-# Sends personalized audit emails to queued dental clinics through Gmail.
+# Sends ONE personalized audit email per run from the Supabase queue through Gmail.
+# Schedule: every hour at :17, Mon-Fri; the script itself only sends between 9:00 and 17:59
+# US Central time (so it stays inside business hours through daylight-saving changes) and the
+# database never allows more than OUTREACH_DAY_CAP (default 9) per Central-time day or 20 per 24 h.
 # Scheduled runs only happen when the repository variable OUTREACH_ENABLED is "true".
-# Manual runs (Actions tab → Run workflow) work any time; pick verify / dry-run / send.
+# Manual runs (Actions tab -> Run workflow) work any time: verify / dry-run / send / stats.
 
 on:
   schedule:
-    - cron: "7 15 * * 1-5" # Mon–Fri 15:07 UTC ≈ 10am US Eastern
+    - cron: "17 14-23 * * 1-5" # 14:17-23:17 UTC = 8:17am-6:17pm Central; the script skips runs outside 9-5:59
   workflow_dispatch:
     inputs:
       mode:
-        description: "verify = test Gmail login, dry-run = preview only, send = send emails"
+        description: "verify = test Gmail login, dry-run = preview only, send = send now, stats = queue status"
         type: choice
         options: [verify, dry-run, send, stats]
         default: verify
       limit:
-        description: "Max emails this run (the database never allows more than 20 per 24 h)"
-        default: "15"
+        description: "Max emails this run (daily caps still apply)"
+        default: "1"
 
 concurrency:
   group: cold-email
@@ -29,7 +32,7 @@ jobs:
   outreach:
     if: github.event_name == 'workflow_dispatch' || vars.OUTREACH_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,13 +51,17 @@ jobs:
           SENDER_NAME: ${{ vars.SENDER_NAME }}
           SENDER_ADDRESS: ${{ vars.SENDER_ADDRESS }}
           REPLY_TO: ${{ vars.REPLY_TO }}
+          OUTREACH_DAY_CAP: ${{ vars.OUTREACH_DAY_CAP || '9' }}
+          OUTREACH_TZ: America/Chicago
           MODE: ${{ github.event.inputs.mode || 'send' }}
-          LIMIT: ${{ github.event.inputs.limit || vars.OUTREACH_DAILY_LIMIT || '15' }}
+          LIMIT: ${{ github.event.inputs.limit || '1' }}
+          SCHEDULED: ${{ github.event_name == 'schedule' }}
         run: |
+          HOURS=""; [ "$SCHEDULED" = "true" ] && HOURS="--business-hours"
           case "$MODE" in
             verify)  node outreach/gmail-outreach.mjs --verify ;;
             dry-run) node outreach/gmail-outreach.mjs --limit "$LIMIT" ;;
-            send)    node outreach/gmail-outreach.mjs --send --limit "$LIMIT" ;;
+            send)    node outreach/gmail-outreach.mjs --send --limit "$LIMIT" $HOURS ;;
             stats)   node outreach/gmail-outreach.mjs --stats ;;
             *) echo "Unknown mode $MODE"; exit 1 ;;
           esac

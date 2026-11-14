@@ -1,0 +1,55 @@
+name: Daily lead finder
+
+# Finds independent dental practices in smaller US towns (one state per day, from OpenStreetMap),
+# finds the email each one publishes on its own website, audits the site with the real audit engine,
+# and queues the strong prospects for the hourly cold-email workflow. No API key needed.
+# Scheduled runs only happen when the repository variable OUTREACH_ENABLED is "true".
+
+on:
+  schedule:
+    - cron: "41 10 * * *" # daily 10:41 UTC (about 4:41am US Central), before the sending window
+  workflow_dispatch:
+    inputs:
+      state:
+        description: "Two-letter US state (blank = today's state in the rotation)"
+        default: ""
+      target:
+        description: "Clinics to queue this run"
+        default: "12"
+      dry_run:
+        description: "Dry run (find and audit, but save nothing)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: find-leads
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  find:
+    if: github.event_name == 'workflow_dispatch' || vars.OUTREACH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Find, audit and queue leads
+        env:
+          OUTREACH_TOKEN: ${{ secrets.OUTREACH_TOKEN }}
+          LEADS_DAILY_TARGET: ${{ vars.LEADS_DAILY_TARGET || '12' }}
+          STATE_INPUT: ${{ github.event.inputs.state }}
+          TARGET_INPUT: ${{ github.event.inputs.target }}
+          DRY_INPUT: ${{ github.event.inputs.dry_run }}
+        run: |
+          ARGS=""
+          [ -n "$STATE_INPUT" ] && ARGS="$ARGS --state $STATE_INPUT"
+          [ -n "$TARGET_INPUT" ] && ARGS="$ARGS --target $TARGET_INPUT"
+          [ "$DRY_INPUT" = "true" ] && ARGS="$ARGS --dry-run"
+          npx tsx outreach/auto-leads.ts $ARGS
