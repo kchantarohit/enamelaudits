@@ -6,7 +6,7 @@
 
 /**
  * Patient-impact openers, in priority order. The first one whose condition matches the audit leads the email.
- * `when` gets the issue ({id, status, severity, issue, detail}); default is status === "fail".
+ * `when(issue, allIssues)` decides if it applies; default is status === "fail".
  */
 const HOOKS = [
   {
@@ -20,14 +20,16 @@ const HOOKS = [
     open: (d) => `I ran a quick check on ${d} and its robots.txt file blocks search engines from the whole site. If that's not intentional, you may be missing from Google results. It's a one-line fix.`,
   },
   {
-    id: "ssl_certificate",
-    subject: (p, d) => `${d}: certificate problem`,
-    open: (d) => `Heads up: our check found a problem with the security certificate on ${d}. When a certificate is invalid or expires, browsers show a full-page warning instead of your site.`,
-  },
-  {
     id: "https",
     subject: (p, d) => `${d} shows "Not secure"`,
     open: (d) => `Heads up: ${d} doesn't load over a secure https:// connection, so browsers show "Not secure" right next to your practice name. For a healthcare practice that warning alone can make a new patient leave. The fix is usually a free certificate and one redirect.`,
+  },
+  {
+    id: "ssl_certificate",
+    // Only when the site does load over https (an http-only site gets the "Not secure" opener above instead).
+    when: (i, all) => i.status === "fail" && !all.some((x) => x.id === "https" && x.status === "fail"),
+    subject: (p, d) => `${d}: certificate problem`,
+    open: (d) => `Heads up: our check found a problem with the security certificate on ${d}. When a certificate is invalid or expires, browsers show a full-page warning instead of your site.`,
   },
   {
     id: "http_redirect",
@@ -77,7 +79,7 @@ const issuesOf = (audit) => (Array.isArray(audit.issues) && audit.issues.length 
 export function pickIssues(audit) {
   const issues = issuesOf(audit);
   for (const h of HOOKS) {
-    const top = issues.find((i) => i.id === h.id && (h.when ? h.when(i) : i.status === "fail"));
+    const top = issues.find((i) => i.id === h.id && (h.when ? h.when(i, issues) : i.status === "fail"));
     if (top) {
       const second = issues.find((i) => i !== top && RELEVANT.has(i.id) && i.status === "fail" && !(i.id === "viewport"));
       return { hook: h, top, second };
@@ -97,7 +99,8 @@ export function prospectQuality(audit, { maxScore = 89, minIssues = 3 } = {}) {
   if (audit.score > maxScore) return { ok: false, reason: `score ${audit.score} > ${maxScore}` };
   if ((audit.issueCount ?? issuesOf(audit).length) < minIssues) return { ok: false, reason: `fewer than ${minIssues} issues` };
   const strong = issuesOf(audit).filter((i) => RELEVANT.has(i.id) && i.status === "fail" && i.severity !== "low" && i.id !== "img_alt" && i.id !== "render_blocking");
-  const hooked = HOOKS.some((h) => issuesOf(audit).some((i) => i.id === h.id && (h.when ? h.when(i) : i.status === "fail")));
+  const all = issuesOf(audit);
+  const hooked = HOOKS.some((h) => all.some((i) => i.id === h.id && (h.when ? h.when(i, all) : i.status === "fail")));
   if (!hooked && strong.length < 2) return { ok: false, reason: "no strong patient-facing issue" };
   return { ok: true };
 }
