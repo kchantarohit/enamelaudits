@@ -2,6 +2,20 @@
 
 Every action taken against the store, newest first. Reads are listed so each finding can be traced.
 
+## 2026-11-14 — bilingual policy drafts (not published)
+**Writes to the store: none.** Drafts in `policies/drafts/` (refund, shipping, terms of service, contact info), Thai + English. They have `[[...]]` blanks that the owner needs to fill in. Publish only after approval, with `shopPolicyUpdate`.
+
+## 2026-11-14 — shipping rates renamed to Thai
+Approved by the owner. **Writes: 1 mutation** (`deliveryProfileUpdate`, `userErrors: []`).
+
+| Rate | Before | After |
+| --- | --- | --- |
+| `DeliveryMethodDefinition/991658442883` | Standard | จัดส่งมาตรฐาน (฿50, orders ฿0–฿999.99) |
+| `DeliveryMethodDefinition/991681970307` | Free Shipping | จัดส่งฟรี (฿0, orders ฿1,000+) |
+
+- Verified by reading it back: names changed, prices and order-value ranges unchanged.
+- Undo: rename back to `Standard` / `Free Shipping`.
+
 ## 2026-11-14 — domestic shipping: ฿50, free from ฿1,000
 Approved by the owner. **Writes: 1 mutation.** Backup: `backups/2026-11-14-delivery-profile-before.json`
 
