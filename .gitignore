@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+.vercel/
+.env
+.env.local
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
+outreach/out/
+outreach/*.csv
+!outreach/examples/*.csv

@@ -1,0 +1,40 @@
+name: Social autopilot
+
+on:
+  schedule:
+    - cron: "23 15 * * *"   # daily X post (15:23 UTC ≈ 10:23am US Eastern)
+    - cron: "41 13 * * 1"   # Monday Reddit digest
+  workflow_dispatch:
+
+jobs:
+  x-post:
+    if: github.event.schedule != '41 13 * * 1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Post today's tip to X
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+        run: |
+          if [ -z "$X_API_KEY" ]; then echo "X secrets not set; skipping."; exit 0; fi
+          node outreach/x-post.mjs --by-date
+
+  reddit-digest:
+    if: github.event.schedule == '41 13 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Find threads to answer
+        env:
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+        run: node outreach/reddit-finder.mjs --days 7 --out reddit-digest.md
+      - uses: actions/upload-artifact@v4
+        with: { name: reddit-digest, path: reddit-digest.md }
