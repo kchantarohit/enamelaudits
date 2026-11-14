@@ -3,8 +3,9 @@
 //   npx tsx outreach/auto-leads.ts [--state KS] [--target 12] [--max-sites 90] [--dry-run]
 //
 // 1. Picks today's US state (rotates through STATES, one per day) unless --state is given.
-// 2. Asks OpenStreetMap (Overpass API) for dentists with a website in that state, plus every city of
-//    50,000+ people. Drops practices within 15 km of those cities (so: smaller towns), chains,
+// 2. Loads OpenStreetMap data for that state: the Geofabrik state extract filtered with osmium-tool
+//    (the GitHub Action installs it), or the Overpass API when osmium isn't installed. Takes dentists with
+//    a website, plus every city of 50,000+ people. Drops practices within 15 km of those cities (so: smaller towns), chains,
 //    institutions, multi-location groups (same website 3+ times) and directory/social links.
 // 3. Drops domains already in the outreach queue/history or on the suppression list.
 // 4. For the rest, in random order: finds an email the practice publishes on its own site, runs the
@@ -13,6 +14,12 @@
 //    never checked again. Practices with no public email are left alone.
 // Stops once --target practices are queued or --max-sites sites were checked. Logs never show emails.
 // Map data © OpenStreetMap contributors (ODbL).
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { runAudit } from "../src/lib/audit/engine";
 import { rankIssues, severityOf } from "../src/lib/audit/score";
 import { CHECK_BY_ID } from "../src/lib/audit/catalog";
@@ -47,6 +54,15 @@ if (!STATES.includes(STATE)) {
 }
 
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
+const GEOFABRIK: Record<string, string> = {
+  AL: "alabama", AK: "alaska", AZ: "arizona", AR: "arkansas", CA: "california", CO: "colorado", CT: "connecticut", DE: "delaware",
+  FL: "florida", GA: "georgia", HI: "hawaii", ID: "idaho", IL: "illinois", IN: "indiana", IA: "iowa", KS: "kansas", KY: "kentucky",
+  LA: "louisiana", ME: "maine", MD: "maryland", MA: "massachusetts", MI: "michigan", MN: "minnesota", MS: "mississippi", MO: "missouri",
+  MT: "montana", NE: "nebraska", NV: "nevada", NH: "new-hampshire", NJ: "new-jersey", NM: "new-mexico", NY: "new-york",
+  NC: "north-carolina", ND: "north-dakota", OH: "ohio", OK: "oklahoma", OR: "oregon", PA: "pennsylvania", RI: "rhode-island",
+  SC: "south-carolina", SD: "south-dakota", TN: "tennessee", TX: "texas", UT: "utah", VT: "vermont", VA: "virginia", WA: "washington",
+  WV: "west-virginia", WI: "wisconsin", WY: "wyoming",
+};
 const CHAIN_OR_INSTITUTION =
   /aspen dental|heartland dental|western dental|bright now|coast dental|monarch dental|castle dental|kool smiles|affordable dentures|clear ?choice|great expressions|pacific dental|smile brands|dental care alliance|1st family dental|mortenson|perfect teeth|comfort dental|midwest dental|familia dental|dental depot|sonrava|dentalworks|smile direct|community health|health ?center|health system|hospital|university|college|school of|veterans|\bva\b|department of|county health|public health|indian health|tribal|medicaid|mobile dental|correctional/i;
 const BAD_DOMAIN = /(^|\.)(facebook|fb|instagram|linkedin|twitter|x|yelp|google|goo|healthgrades|zocdoc|opencare|yellowpages|mapquest|bing|apple|vitals|webmd|wikipedia|linktr|carrd)\.[a-z]+$|\.(gov|edu|mil)$/i;
@@ -62,24 +78,78 @@ function km(a1: number, o1: number, a2: number, o2: number) {
 
 async function overpass(query: string): Promise<El[]> {
   let last = "";
-  for (let attempt = 0; attempt < OVERPASS.length * 2; attempt++) {
-    const url = OVERPASS[attempt % OVERPASS.length];
+  for (const url of OVERPASS) {
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": UA },
         body: "data=" + encodeURIComponent(query),
-        signal: AbortSignal.timeout(200_000),
+        signal: AbortSignal.timeout(150_000),
       });
       if (res.ok) return ((await res.json()) as { elements: El[] }).elements || [];
       last = `${new URL(url).host} HTTP ${res.status}`;
     } catch (e) {
       last = `${new URL(url).host} ${(e as Error).message}`;
     }
-    console.log(`Overpass attempt ${attempt + 1} failed (${last}); retrying...`);
-    await sleep(15_000);
+    console.log(`Overpass: ${last}; trying the next server...`);
+    await sleep(5_000);
   }
   throw new Error(`Overpass API unavailable: ${last}`);
+}
+
+const hasOsmium = () => {
+  try {
+    execFileSync("osmium", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Download the state's OpenStreetMap extract from Geofabrik and keep dentists + populated places. */
+async function geofabrik(): Promise<El[]> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "osm-"));
+  const pbf = path.join(dir, "state.osm.pbf");
+  const url = `https://download.geofabrik.de/north-america/us/${GEOFABRIK[STATE]}-latest.osm.pbf`;
+  const res = await fetch(url, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(900_000) });
+  if (!res.ok || !res.body) throw new Error(`Geofabrik HTTP ${res.status}`);
+  await pipeline(Readable.fromWeb(res.body as any), fs.createWriteStream(pbf));
+  console.log(`Geofabrik: downloaded ${GEOFABRIK[STATE]} (${Math.round(fs.statSync(pbf).size / 1e6)} MB).`);
+  const filtered = path.join(dir, "dentists.osm.pbf");
+  const out = path.join(dir, "dentists.geojsonseq");
+  execFileSync("osmium", ["tags-filter", pbf, "nwr/amenity=dentist", "nwr/healthcare=dentist", "n/place=city,town,village", "-o", filtered, "--overwrite"], { stdio: "inherit" });
+  execFileSync("osmium", ["export", filtered, "-f", "geojsonseq", "-o", out, "--overwrite", "-a", "type,id"], { stdio: "inherit" });
+  const els: El[] = [];
+  for (const line of fs.readFileSync(out, "utf8").split("\n")) {
+    const json = line.replace(/^\x1e/, "").trim();
+    if (!json) continue;
+    const f = JSON.parse(json) as { geometry: { type: string; coordinates: any }; properties: Record<string, string> };
+    // First coordinate pair of any geometry is close enough to place a practice within a town.
+    let c: any = f.geometry?.coordinates;
+    while (Array.isArray(c) && Array.isArray(c[0])) c = c[0];
+    if (!Array.isArray(c) || c.length < 2) continue;
+    const { "@type": type, "@id": id, ...tags } = f.properties || {};
+    els.push({ type: String(type || "node"), id: Number(id) || 0, lon: Number(c[0]), lat: Number(c[1]), tags });
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+  return els;
+}
+
+async function loadOsm(): Promise<El[]> {
+  if (hasOsmium()) {
+    try {
+      return await geofabrik();
+    } catch (e) {
+      console.log(`Geofabrik/osmium failed (${(e as Error).message}); falling back to the Overpass API.`);
+    }
+  }
+  return overpass(`[out:json][timeout:180];
+area["ISO3166-2"="US-${STATE}"]["admin_level"="4"]->.s;
+(nwr["amenity"="dentist"](area.s); nwr["healthcare"="dentist"](area.s);)->.d;
+(nwr.d["website"]; nwr.d["contact:website"]; nwr.d["url"];);
+out center;
+node["place"~"^(city|town|village)$"](area.s);
+out;`);
 }
 
 async function api(action: string, body: Record<string, unknown> = {}) {
@@ -106,16 +176,10 @@ if (!DRY) {
   }
 }
 
-const elements = await overpass(`[out:json][timeout:180];
-area["ISO3166-2"="US-${STATE}"]["admin_level"="4"]->.s;
-(nwr["amenity"="dentist"](area.s); nwr["healthcare"="dentist"](area.s);)->.d;
-(nwr.d["website"]; nwr.d["contact:website"]; nwr.d["url"];);
-out center;
-node["place"~"^(city|town|village)$"](area.s);
-out;`);
+const elements = await loadOsm();
 
 const places = elements
-  .filter((e) => e.tags?.place && e.lat != null && e.lon != null)
+  .filter((e) => e.tags?.place && e.type === "node" && e.lat != null && e.lon != null)
   .map((e) => ({ name: e.tags!.name || "", lat: e.lat!, lon: e.lon!, pop: Number(String(e.tags!.population || "").replace(/[^\d]/g, "")) || 0 }));
 const bigCities = places.filter((p) => p.pop >= BIG_CITY_POP);
 
